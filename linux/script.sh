@@ -30,3 +30,56 @@
 # Must be run after the installation of the AD and DNS server (Windows Server 2019).
 #
 ############
+
+####################
+# GLOBAL FUNCTIONS #
+####################
+
+update_system() {
+}
+
+global_configuration() {
+}
+
+ssh_configuration() {
+}
+
+add_services() {
+}
+
+firewall_configuration() {
+}
+
+backup_configuration() {
+}
+
+antimalware_configuration() {
+}
+
+exit_configuration() {
+}
+
+######################
+# SERVICES FUNCTIONS #
+######################
+
+apache_configuration() {
+}
+
+html_configuration() {
+}
+
+database_configuration() {
+}
+
+php_configuration() {
+}
+
+#################
+# MAIN FUNCTION #
+#################
+
+main() {
+}
+
+main
