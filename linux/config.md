@@ -3,7 +3,7 @@
 
 ## Général
 
-- Stockage : 25Go + 25Go (RAID)
+- Stockage : 30Go + 30Go (RAID)
 - Root désactivé
 - Mot de passe par défault : ""
 - Mot de passe (chiffrement) : ""
