@@ -164,6 +164,7 @@ global_configuration() {
 }
 
 ssh_configuration() {
+    clear
     echo -e "\n${BLUE}---------------------${ENDCOLOR}"
     echo -e "${BLUE}  SSH Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}---------------------${ENDCOLOR}\n"
@@ -173,7 +174,7 @@ ssh_configuration() {
     sed -i "40s/#//; 40s/prohibit-password/no/" /etc/ssh/sshd_config
     sed -i "65s/#//; 65s/yes/no/" /etc/ssh/sshd_config
     sed -i "66s/#//" /etc/ssh/sshd_config
-    sed -i "69s/#//; 65s/yes/no/" /etc/ssh/sshd_config
+    sed -i "69s/#//; 69s/yes/no/" /etc/ssh/sshd_config
     sed -i "96s/#//; 96s/no/yes/" /etc/ssh/sshd_config
 
     semanage port -a -t ssh_port_t -p tcp $PORT 
@@ -185,11 +186,10 @@ ssh_configuration() {
     systemctl restart sshd
 
     echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
-    clear
 }
 
 add_services() {
-    echo -e "${BLUE}---------------${ENDCOLOR}"
+    echo -e "\n${BLUE}---------------${ENDCOLOR}"
     echo -e "${BLUE}   Services    ${ENDCOLOR}"
     echo -e "${BLUE} configuration ${ENDCOLOR}"
     echo -e "${BLUE}---------------${ENDCOLOR}\n"
@@ -202,12 +202,89 @@ add_services() {
 }
 
 backup_configuration() {
+    clear
+    echo -e "\n${BLUE}---------------${ENDCOLOR}"
+    echo -e "${BLUE}    Backup     ${ENDCOLOR}"
+    echo -e "${BLUE} Configuration ${ENDCOLOR}"
+    echo -e "${BLUE}---------------${ENDCOLOR}\n"
+
+    touch /sbin/dailybackup
+    chmod 755 /sbin/dailybackup
+
+    cat <<EOF > /sbin/dailybackup
+#!/bin/bash
+clear
+read -p "Enter the path where you want to save the backups : " BACKUPPATH
+
+BACKUPPATH="\$BACKUPPATH"
+TIMESTAMP=\$(date +%Y-%m-%d&_%H-%M-%S)
+mkdir /\$BACKUPPATH/\$TIMESTAMP
+
+rsync -avz --delete /etc/ \$BACKUPPATH/\$TIMESTAMP/etc
+rsync -avz --delete /web/ \$BACKUPPATH/\$TIMESTAMP/web
+rsync -avz --delete /var/ \$BACKUPPATH/\$TIMESTAMP/var
+rsync -avz --delete /home/ \$BACKUPPATH/\$TIMESTAMP/home
+rsync -avz --delete /root/ \$BACKUPPATH/\$TIMESTAMP/root
+
+# Compression des sauvegardes
+tar -czf \$BACKUPPATH/\$TIMESTAMP/etc.tar.gz -C \$BACKUPPATH/\$TIMESTAMP etc
+tar -czf \$BACKUPPATH/\$TIMESTAMP/web.tar.gz -C \$BACKUPPATH/\$TIMESTAMP web
+tar -czf \$BACKUPPATH/\$TIMESTAMP/var.tar.gz -C \$BACKUPPATH/\$TIMESTAMP var
+tar -czf \$BACKUPPATH/\$TIMESTAMP/home.tar.gz -C \$BACKUPPATH/\$TIMESTAMP home
+tar -czf \$BACKUPPATH/\$TIMESTAMP/root.tar.gz -C \$BACKUPPATH/\$TIMESTAMP root
+
+# Suppression des répertoires non compressés
+rm -rf \$BACKUPPATH/\$TIMESTAMP/etc
+rm -rf \$BACKUPPATH/\$TIMESTAMP/web
+rm -rf \$BACKUPPATH/\$TIMESTAMP/var
+rm -rf \$BACKUPPATH/\$TIMESTAMP/home
+rm -rf \$BACKUPPATH/\$TIMESTAMP/root
+
+echo -e ""
+
+EOF
+    mkdir -p /root/.cache/crontab
+    bash -c "(crontab -l 2>/dev/null; echo '0 12 * * * /sbin/dailybackup') | crontab -"
+
+    echo -e "\n${GREEN}Backup configuration done.${ENDCOLOR}\n"
 }
 
-antimalware_configuration() {
-}
+restore_backup() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}  Restore Backup ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
 
-exit_configuration() {
+    touch /sbin/restorebackup
+    chmod 755 /sbin/restorebackup
+
+    cat <<EOF > /sbin/restorebackup
+#!/bin/bash
+
+read -p "Enter the path where the backups are stored : " BACKUPPATH
+echo -e "\nAvailable backups :\n"
+ls -1 \$BACKUPPATH
+echo -e "-------------------\n"
+read -p "Enter the date of the backup to restore (format: YYYY-MM-DD_H-m-s) : " BACKUPDATE
+
+for dir in etc web var home root; do
+    BACKUP_FILE="\$BACKUPPATH/\$BACKUPDATE/\${dir}.tar.gz"
+    if [ ! -f "\$BACKUP_FILE" ]; then
+        echo -e "Backup file \$BACKUP_FILE does not exist."
+        return 1
+    fi
+done
+
+for dir in etc web var home root; do
+    BACKUP_FILE="\$BACKUPPATH/\$BACKUPDATE/\${dir}.tar.gz"
+    echo -e "Restoring \$BACKUP_FILE to /\$dir"
+    
+    # Extraire l'archive dans le répertoire cible
+    tar -xzf "\$BACKUP_FILE" -C "/"
+done
+
+EOF
+    echo -e "${GREEN}Backup restoration configuration completed.\n${ENDCOLOR}"
 }
 
 ######################
@@ -221,6 +298,9 @@ database_configuration() {
 }
 
 php_configuration() {
+}
+
+antimalware_configuration() {
 }
 
 #################
