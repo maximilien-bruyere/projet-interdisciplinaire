@@ -181,8 +181,8 @@ ssh_configuration() {
 
     firewall-cmd --add-port=$PORT/tcp --permanent
     firewall-cmd --remove-service=ssh --permanent
+    firewalld-cmd --reload
 
-    systemctl restart firewalld
     systemctl restart sshd
 
     echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
@@ -197,6 +197,7 @@ add_services() {
     apache_configuration
     database_configuration
     php_configuration
+    antimalware_configuration
 
     echo -e "\n${GREEN}Services configurations done.${ENDCOLOR}\n"
 }
@@ -301,6 +302,30 @@ php_configuration() {
 }
 
 antimalware_configuration() {
+    clear 
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}   Antimalware   ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf -y install clamav clamd 
+
+    mkdir /var/log/clamav
+    touch /var/log/clamav/clamav-scan.log
+
+    # Every day at 12:30, the server will scan the entire system.
+    bash -c "(crontab -l 2>/dev/null; echo '30 12 * * * /usr/bin/clamscan -ri / >> /var/log/clamav/clamav-scan.log') | crontab -"
+
+    # Every Wednesday at 12:00, the server will update the antivirus database.
+    bash -c "(crontab -l 2>/dev/null; echo '0 12 3 * * freshclam') | crontab -"
+
+    systemctl start clamav-freshclam
+    systemctl enable clamav-freshclam
+
+    firewalld-cmd --add-port=3310/tcp --permanent
+    firewalld-cmd --reload
+
+    echo -e "\n${GREEN}Antimalware configuration done.${ENDCOLOR}\n"
 }
 
 #################
