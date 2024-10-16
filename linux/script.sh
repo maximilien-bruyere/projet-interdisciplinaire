@@ -79,6 +79,9 @@ global_configuration() {
     echo -e "\n${BLUE}--------------------------${ENDCOLOR}"
     echo -e "${BLUE}   Global Configurations  ${ENDCOLOR}"
     echo -e "${BLUE}--------------------------${ENDCOLOR}\n"
+    
+    updatedb
+    dnf -y install git
 
     read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME
     read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME
@@ -89,6 +92,8 @@ global_configuration() {
     hostnamectl set-hostname $HOSTNAME
     rm -rf /etc/resolv.conf
     systemctl restart NetworkManager
+
+    systemctl enable --now cockpit.socket
 
     echo -e "\n${GREEN}Hostname changed.${ENDCOLOR}\n"
 
@@ -181,7 +186,7 @@ ssh_configuration() {
 
     firewall-cmd --add-port=$PORT/tcp --permanent
     firewall-cmd --remove-service=ssh --permanent
-    firewalld-cmd --reload
+    firewall-cmd --reload
 
     systemctl restart sshd
 
@@ -218,7 +223,7 @@ clear
 read -p "Enter the path where you want to save the backups : " BACKUPPATH
 
 BACKUPPATH="\$BACKUPPATH"
-TIMESTAMP=\$(date +%Y-%m-%d&_%H-%M-%S)
+TIMESTAMP=\$(date +%Y-%m-%d_%H-%M-%S)
 mkdir /\$BACKUPPATH/\$TIMESTAMP
 
 rsync -avz --delete /etc/ \$BACKUPPATH/\$TIMESTAMP/etc
@@ -247,7 +252,7 @@ EOF
     mkdir -p /root/.cache/crontab
     bash -c "(crontab -l 2>/dev/null; echo '0 12 * * * /sbin/dailybackup') | crontab -"
 
-    echo -e "\n${GREEN}Backup configuration done.${ENDCOLOR}\n"
+    echo -e "${GREEN}Backup configuration done.${ENDCOLOR}\n"
 }
 
 restore_backup() {
@@ -322,10 +327,43 @@ antimalware_configuration() {
     systemctl start clamav-freshclam
     systemctl enable clamav-freshclam
 
-    firewalld-cmd --add-port=3310/tcp --permanent
-    firewalld-cmd --reload
+    firewall-cmd --add-port=3310/tcp --permanent
+    firewall-cmd --reload
 
     echo -e "\n${GREEN}Antimalware configuration done.${ENDCOLOR}\n"
+}
+
+fail2ban_configuration() {
+    clear 
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}    Fail2Ban     ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf -y install fail2ban
+
+    systemctl start fail2ban
+    systemctl enable fail2ban
+
+    # Command to unban an IP : fail2ban-client set sshd unbanip [ip]
+
+    read -p "Enter the ssh port : " SSHPORT
+
+    cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+
+    sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
+    sed -i "110s/5/3/" /etc/fail2ban/jail.local
+    sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
+    sed -i "279s/#//; 279s/normal/aggressive/" /etc/fail2ban/jail.local
+    sed -i "280s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
+    sed -i "283s/^$/enabled = true/" /etc/fail2ban/jail.local
+    sed -i "287s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
+    sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
+    sed -i "294s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
+
+    systemctl restart fail2ban
+
+    echo -e "\n${GREEN}Fail2Ban configuration done.${ENDCOLOR}\n"
 }
 
 #################
