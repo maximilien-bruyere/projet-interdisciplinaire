@@ -194,15 +194,17 @@ ssh_configuration() {
 }
 
 add_services() {
+    clear
     echo -e "\n${BLUE}---------------${ENDCOLOR}"
     echo -e "${BLUE}   Services    ${ENDCOLOR}"
     echo -e "${BLUE} configuration ${ENDCOLOR}"
     echo -e "${BLUE}---------------${ENDCOLOR}\n"
 
+    antimalware_configuration
+    fail2ban_configuration
     apache_configuration
     database_configuration
     php_configuration
-    antimalware_configuration
 
     echo -e "\n${GREEN}Services configurations done.${ENDCOLOR}\n"
 }
@@ -226,20 +228,21 @@ BACKUPPATH="\$BACKUPPATH"
 TIMESTAMP=\$(date +%Y-%m-%d_%H-%M-%S)
 mkdir /\$BACKUPPATH/\$TIMESTAMP
 
+# Backup of the system
 rsync -avz --delete /etc/ \$BACKUPPATH/\$TIMESTAMP/etc
 rsync -avz --delete /web/ \$BACKUPPATH/\$TIMESTAMP/web
 rsync -avz --delete /var/ \$BACKUPPATH/\$TIMESTAMP/var
 rsync -avz --delete /home/ \$BACKUPPATH/\$TIMESTAMP/home
 rsync -avz --delete /root/ \$BACKUPPATH/\$TIMESTAMP/root
 
-# Compression des sauvegardes
+# Compression of backups
 tar -czf \$BACKUPPATH/\$TIMESTAMP/etc.tar.gz -C \$BACKUPPATH/\$TIMESTAMP etc
 tar -czf \$BACKUPPATH/\$TIMESTAMP/web.tar.gz -C \$BACKUPPATH/\$TIMESTAMP web
 tar -czf \$BACKUPPATH/\$TIMESTAMP/var.tar.gz -C \$BACKUPPATH/\$TIMESTAMP var
 tar -czf \$BACKUPPATH/\$TIMESTAMP/home.tar.gz -C \$BACKUPPATH/\$TIMESTAMP home
 tar -czf \$BACKUPPATH/\$TIMESTAMP/root.tar.gz -C \$BACKUPPATH/\$TIMESTAMP root
 
-# Suppression des répertoires non compressés
+# Remove uncompressed backups
 rm -rf \$BACKUPPATH/\$TIMESTAMP/etc
 rm -rf \$BACKUPPATH/\$TIMESTAMP/web
 rm -rf \$BACKUPPATH/\$TIMESTAMP/var
@@ -284,8 +287,6 @@ done
 for dir in etc web var home root; do
     BACKUP_FILE="\$BACKUPPATH/\$BACKUPDATE/\${dir}.tar.gz"
     echo -e "Restoring \$BACKUP_FILE to /\$dir"
-    
-    # Extraire l'archive dans le répertoire cible
     tar -xzf "\$BACKUP_FILE" -C "/"
 done
 
