@@ -71,7 +71,6 @@ delete_users() {
     userdel -r $UID
 
     echo -e "\n${GREEN}User deleted.${ENDCOLOR}\n"
-    clear
 }
 
 global_configuration() {
@@ -100,7 +99,7 @@ global_configuration() {
     # All users will got as name : [familyname].[firstname]
     users_list=()
     read -p "How many people need access to the server ? : [number] " NUMBERPEOPLE
-    for (( user=1; user<=$NUMBERPEOPLE; user++)); do 
+    for (( user=1; user<=$NUMBERPEOPLE; user++ )); do 
         echo -e "\nUser number : $user"
         echo -e "----------------\n"
         read -p "What's the username number ? : [string] " USERNAME
@@ -193,22 +192,6 @@ ssh_configuration() {
     echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
 }
 
-add_services() {
-    clear
-    echo -e "\n${BLUE}---------------${ENDCOLOR}"
-    echo -e "${BLUE}   Services    ${ENDCOLOR}"
-    echo -e "${BLUE} configuration ${ENDCOLOR}"
-    echo -e "${BLUE}---------------${ENDCOLOR}\n"
-
-    antimalware_configuration
-    fail2ban_configuration
-    apache_configuration
-    database_configuration
-    php_configuration
-
-    echo -e "\n${GREEN}Services configurations done.${ENDCOLOR}\n"
-}
-
 backup_configuration() {
     clear
     echo -e "\n${BLUE}---------------${ENDCOLOR}"
@@ -298,19 +281,48 @@ EOF
 # SERVICES FUNCTIONS #
 ######################
 
-apache_configuration() {
+add_services() {
+
+    while true; do 
+        clear
+        echo -e "\n${BLUE}---------------${ENDCOLOR}"
+        echo -e "${BLUE}   Services    ${ENDCOLOR}"
+        echo -e "${BLUE} configuration ${ENDCOLOR}"
+        echo -e "${BLUE}---------------${ENDCOLOR}\n"
+
+        echo -e "1. ClamAV ${RED}[security]${ENDCOLOR}"
+        echo -e "2. Fail2ban ${RED}[security]${ENDCOLOR}"
+        echo -e "3. Grub ${RED}[security]${ENDCOLOR}"
+        echo -e "4. Fstab ${RED}[security]${ENDCOLOR}"
+        echo -e "5. Nmap ${RED}[security]${ENDCOLOR}"
+        echo -e "6. Httpd ${BLUE}[web]${ENDCOLOR}"
+        echo -e "7. MariaDB ${BLUE}[web]${ENDCOLOR}"
+        echo -e "8. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
+        echo -e "9. Automatic configuration"
+        echo -e "10. Previous menu\n"
+
+        read -p "Enter your choice : " CHOICESERVICE
+
+        case $CHOICESERVICE in 
+            1) clamav_configuration; add_services; break ;;
+            2) fail2ban_configuration; add_services; break ;;
+            3) grub_configuration; add_services; break ;;
+            4) fstab_configuration; add_services; break ;;
+            5) nmap_configuration; add_services; break ;;
+            6) httpd_configuration; add_services; break ;;
+            7) mariaDB_configuration; add_services; break ;;
+            8) phpMyAdmin_configuration; add_services; break ;;
+            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; mariaDB_configuration; php_configuration; fstab_configuration; break;;
+            10) main; break;; 
+            *) echo -e "Invalid value, please try again";; 
+        esac
+    done
 }
 
-database_configuration() {
-}
-
-php_configuration() {
-}
-
-antimalware_configuration() {
+clamav_configuration() {
     clear 
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}   Antimalware   ${ENDCOLOR}"
+    echo -e "${BLUE}     ClamAV      ${ENDCOLOR}"
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}-----------------${ENDCOLOR}\n"
 
@@ -331,7 +343,7 @@ antimalware_configuration() {
     firewall-cmd --add-port=3310/tcp --permanent
     firewall-cmd --reload
 
-    echo -e "\n${GREEN}Antimalware configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}ClamAV configuration done.${ENDCOLOR}\n"
 }
 
 fail2ban_configuration() {
@@ -367,12 +379,148 @@ fail2ban_configuration() {
     echo -e "\n${GREEN}Fail2Ban configuration done.${ENDCOLOR}\n"
 }
 
+nmap_configuration() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      Nmap       ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf -y install nmap
+
+    echo -e "Available IP addresses :"
+    ip add | grep inet | grep -v inet6 | awk '{print $2}' | cut -d'/' -f1
+
+    #!/bin/bash
+
+    chmod 750 /usr/bin/nmap
+
+    setfacl -m o::0 /usr/bin/nmap
+
+    echo -e "Choose the IP address to scan."
+    read -p "Enter the IP address : " IPADDRESS
+
+    nmap $IPADDRESS 
+
+    echo -e "\n${GREEN}Nmap configuration done.${ENDCOLOR}\n"
+}
+
+grub_configuration() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      Grub       ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    
+    # use this function before changing /etc/fstab
+    read -p "Enter the username : " USERNAMEGRUB
+    echo -n "Enter the password : " && read -s PASSWORDGRUB && echo
+
+    echo 'cat << EOF' >> /etc/grub.d/00_header
+    echo 'set superusers="$USERNAMEGRUB"' >> /etc/grub.d/00_header
+    echo 'password $USERNAMEGRUB $PASSWORDGRUB' >> /etc/grub.d/00_header
+    echo 'EOF' >> /etc/grub.d/00_header
+
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+
+    echo -e "\n${GREEN}Grub configuration done.${ENDCOLOR}\n"
+}
+
+fstab_configuration() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}     Fstab       ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    echo -e "Available mounting options :"
+    echo -e "----------------------------\n"
+    echo -e "nodev : Do not interpret character or block special devices on the file system."
+    echo -e "noexec : Do not allow execution of any binaries on the mounted file system."
+    echo -e "nosuid : Do not allow set-user-identifier or set-group-identifier bits to take effect."
+    echo -e "ro : Mount the file system read-only."
+    echo -e "relatime : Update inode access times relative to modify or change time."
+    echo -e "defaults : Use the default options : rw, suid, dev, exec, auto, nouser, and async."
+
+    for (( partition=12; partition<=19; partition++ )); do
+        second_column=$(awk -v partition="$partition" 'NF && $1 !~ /^#/ {if (NR==partition) print $2}' /etc/fstab)
+        
+        echo -e "\n----------------"
+        echo -e "Partition : $second_column"
+        echo -e "----------------\n"
+
+        read -p "Enter the mounting options (ex : defaults,nodev,noexec,...) : " MOUNTINGOPTIONS
+
+        case $second_column in
+
+            /) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
+            /backup) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;; 
+            /boot/efi) echo -e "No available mouting options.";;
+            /boot) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
+            /home) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
+            /tmp) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;; 
+            /var) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
+            /web) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
+            *) echo -e "No available mouting options.";;
+        esac
+    done
+
+    echo -e "\n${GREEN}Fstab configuration done.${ENDCOLOR}\n"
+
+    echo -e "The system will restart."
+    read -p "Press any key to continue... " -n1 -s
+
+    shutdown -r now
+}
+
+httpd_configuration() {
+    echo -e "TEST"
+}
+
+mariaDB_configuration() {
+    echo -e "TEST2"
+}
+
+phpMyAdmin_configuration() {
+    echo -e "TEST3"
+}
+
 #################
 # MAIN FUNCTION #
 #################
 
 main() {
+    check_root
+        
+    while true; do 
+        clear
+        echo -e "\n${BLUE}------${ENDCOLOR}"
+        echo -e "${BLUE} Menu ${ENDCOLOR}"
+        echo -e "${BLUE}------${ENDCOLOR}\n"
+
+        echo -e "1. Update the system"
+        echo -e "2. Global configurations"
+        echo -e "3. SSH configuration"
+        echo -e "4. Add services"
+        echo -e "5. Backup configuration"
+        echo -e "6. Restore backup"
+        echo -e "7. Automatic configuration"
+        echo -e "8. Exit\n"
+
+        read -p "Enter your choice : " CHOICE
+
+        case $CHOICE in 
+            1) update_system; main; break ;;
+            2) global_configuration; main; break ;;
+            3) ssh_configuration; main; break ;;
+            4) add_services; break ;;
+            5) backup_configuration; main; break ;;
+            6) restore_backup; main; break ;;
+            7) update_system; global_configuration; ssh_configuration; backup_configuration; restore_backup; add_services; break ;;
+            7) echo -e "Ciao !"; break ;;
+            *) echo -e "Invalid value, please try again";; 
+        esac
+    done 
 }
 
-check_root
 main
