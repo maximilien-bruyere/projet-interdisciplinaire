@@ -98,7 +98,16 @@ global_configuration() {
 
     # All users will got as name : [familyname].[firstname]
     users_list=()
-    read -p "How many people need access to the server ? : [number] " NUMBERPEOPLE
+
+    while true; do
+        read -p "How many people need access to the server ? : [number] " NUMBERPEOPLE
+        if [[ $NUMBERPEOPLE -ge 1 ]]; then
+            break
+        else
+            echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+        fi
+    done
+    
     for (( user=1; user<=$NUMBERPEOPLE; user++ )); do 
         echo -e "\nUser number : $user"
         echo -e "----------------\n"
@@ -113,9 +122,18 @@ global_configuration() {
             users_list+=($USERNAME)
 
             continue
-        fi
+        fi 
 
-        read -p "Does this person need to have full access to the server? : [no/yes] " ACCESSCHOICE
+        while true; do 
+            read -p "Does this person need to have full access to the server? : [no/yes] " ACCESSCHOICE
+
+            if [[ $ACCESSCHOICE == "yes" || $ACCESSCHOICE == "no" ]]
+            then
+                break
+            else
+                echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+            fi
+        done 
 
         if [[ $ACCESSCHOICE == "yes" ]]
         then 
@@ -173,7 +191,15 @@ ssh_configuration() {
     echo -e "${BLUE}  SSH Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}---------------------${ENDCOLOR}\n"
 
-    read -p "Choose port for ssh : " PORT
+    while true; do 
+        read -p "Choose port for ssh : " PORT
+        if [[ $PORT -ge 1024 && $PORT -le 65535 ]]; then
+            break
+        else
+            echo -e "${RED}Invalid port, please try again.${ENDCOLOR}"
+        fi
+    done
+
     sed -i "21s/#//; 21s/22/$PORT/" /etc/ssh/sshd_config
     sed -i "40s/#//; 40s/prohibit-password/no/" /etc/ssh/sshd_config
     sed -i "65s/#//; 65s/yes/no/" /etc/ssh/sshd_config
@@ -360,7 +386,14 @@ fail2ban_configuration() {
 
     # Command to unban an IP : fail2ban-client set sshd unbanip [ip]
 
-    read -p "Enter the ssh port : " SSHPORT
+    while true; do 
+        read -p "Enter port for ssh : " SSHPORT
+        if [[ $PORT -ge 1024 && $PORT -le 65535 ]]; then
+            break
+        else
+            echo -e "${RED}Invalid port, please try again.${ENDCOLOR}"
+        fi
+    done
 
     cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 
