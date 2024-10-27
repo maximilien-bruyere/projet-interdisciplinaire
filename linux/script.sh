@@ -17,7 +17,7 @@
 #   P : PHP
 #
 # It will work with an AD and DNS server (Windows Server 2019) and 
-# a client (Windows 10).
+# clients (Windows 10 - Windows 11).
 #
 ###############
 
@@ -48,9 +48,56 @@ check_root() {
     fi
 }
 
+starting() {
+    clear
+
+    while true; do 
+        clear
+        echo -e "${BLUE}-----------------${ENDCOLOR}"
+        echo -e "${BLUE}    Welcome    ${ENDCOLOR}"
+        echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+        echo -e "To ensure that the configuration runs smoothly, we're going to ask you"
+        echo -e "a few questions about the services we're going to set up.\n"
+
+        read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME; echo "HOSTNAME=$HOSTNAME" > ./config.conf
+        read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME;     echo "SERVERNAME=$SERVERNAME" >> ./config.conf
+        read -p "Enter the domain (ex : .[lan]) : " DOMAIN; echo "DOMAIN=$DOMAIN" >> ./config.conf
+
+        echo -e "\nHere is the informations about your Network."
+        echo -e "Please, answer to the next questions\n"
+        ip address
+        echo -e "\n"
+
+        read -p "Enter the IP Address (ex : [192.168.1.120]) : " IPADDRESS; echo "IPADDRESS=$IPADDRESS" >> ./config.conf
+        read -p "Enter the Network Address (ex : [192.168.1.0]) : " NETWORKADDRESS; echo "NETWORKADDRESS=$NETWORKADDRESS" >> ./config.conf
+        read -p "Enter the Subnet Mask (ex : 192.168.1.80/[24]) : " SUBNETMASK; echo "SUBNETMASK=$SUBNETMASK" >> ./config.conf
+
+        echo -e "Config.conf file :\n"
+        cat ./config.conf
+        echo -e ""
+        while true; do
+            read -p "Is it good for you [yes/no] ?" YESORNO
+            if [[ $YESORNO == "yes" || $YESORNO == "no" ]]
+            then
+                break
+            else
+                echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+            fi
+        done
+
+        if [[ $YESORNO == "yes" ]]
+        then 
+            echo -e "Good, go to the next step."
+            break
+        fi 
+    done 
+    echo -e "\n${GREEN}File {config.conf} created.${ENDCOLOR}\n"
+}
+
 update_system() {
     clear
-    echo -e "\n${BLUE}------------${ENDCOLOR}"
+    echo -e "${BLUE}------------${ENDCOLOR}"
     echo -e "${BLUE}   Update   ${ENDCOLOR}"
     echo -e "${BLUE}------------${ENDCOLOR}\n"
 
@@ -62,7 +109,7 @@ update_system() {
 
 delete_users() {
     clear
-    echo -e "\n${BLUE}----------------${ENDCOLOR}"
+    echo -e "${BLUE}----------------${ENDCOLOR}"
     echo -e "${BLUE}   Delete User  ${ENDCOLOR}"
     echo -e "${BLUE}----------------${ENDCOLOR}\n"
 
@@ -73,21 +120,17 @@ delete_users() {
     echo -e "\n${GREEN}User deleted.${ENDCOLOR}\n"
 }
 
+
 global_configuration() {
     clear
     echo -e "\n${BLUE}--------------------------${ENDCOLOR}"
     echo -e "${BLUE}   Global Configurations  ${ENDCOLOR}"
     echo -e "${BLUE}--------------------------${ENDCOLOR}\n"
     
+    source ./config.conf
+    
     updatedb
     dnf -y install git
-
-    read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME
-    read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME
-    read -p "Enter the domain (ex : .[lan]) : " DOMAIN
-    echo "HOSTNAME=$HOSTNAME" >> ./config.conf
-    echo "DOMAIN=$DOMAIN" >> ./config.conf
-    echo "SERVERNAME=$SERVERNAME" >> ./config.conf
     hostnamectl set-hostname $HOSTNAME
     rm -rf /etc/resolv.conf
     systemctl restart NetworkManager
@@ -116,7 +159,7 @@ global_configuration() {
         if [ $(id -u $USERNAME) ]
         then
             echo -e "${RED}This username already exists.${ENDCOLOR}"
-            sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$HOSTNAME.$SERVERNAME.$DOMAIN"
+            sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$IPADDRESS"
             mv /home/$USERNAME/.ssh/id_rsa.pub /home/$USERNAME/.ssh/authorized_keys
 
             users_list+=($USERNAME)
@@ -338,7 +381,7 @@ add_services() {
             6) httpd_configuration; add_services; break ;;
             7) mariaDB_configuration; add_services; break ;;
             8) phpMyAdmin_configuration; add_services; break ;;
-            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; mariaDB_configuration; php_configuration; fstab_configuration; break;;
+            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; mariaDB_configuration; php_configuration; break;;
             10) main; break;; 
             *) echo -e "Invalid value, please try again";; 
         esac
@@ -414,6 +457,7 @@ fail2ban_configuration() {
 
 nmap_configuration() {
     clear
+    source ./config.conf
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}      Nmap       ${ENDCOLOR}"
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
@@ -421,15 +465,8 @@ nmap_configuration() {
 
     dnf -y install nmap
 
-    echo -e "Available IP addresses :"
-    ip add | grep inet | grep -v inet6 | awk '{print $2}' | cut -d'/' -f1
-
-    #!/bin/bash
-
     chmod 750 /usr/bin/nmap
-
     setfacl -m o::0 /usr/bin/nmap
-
     echo -e "Choose the IP address to scan."
     read -p "Enter the IP address : " IPADDRESS
 
@@ -507,15 +544,94 @@ fstab_configuration() {
 }
 
 httpd_configuration() {
-    echo -e "TEST"
+
+    # YOU NEED TO DESACTIVATE IPV6 
+
+    echo -e "${BLUE}---------------{ENDCOLOR}"
+    echo -e "${BLUE}     Httpd     {ENDCOLOR}"
+    echo -e "${BLUE} Configuration {ENDCOLOR}"
+    echo -e "${BLUE}---------------{ENDCOLOR}\n"
+
+    source ./config.conf
+
+    dnf -y install httpd 
+    dnf -y install mod_ssl
+
+    systemctl start httpd
+    systemctl enable httpd
+
+    read -p "Enter where the website will be stored : " WEBSITEPATH
+    read -p "Enter the parent folder of the website : " PARENTFOLDER
+
+    HTTPD_CONF="/etc/httpd/conf/httpd.conf"
+
+    cp $HTTPD_CONF $HTTPD_CONF.bak
+
+    sed -i "47s/.*/Listen $IPADDRESS:80/" $HTTPD_CONF
+    sed -i "100s/.*/ServerName $HOSTNAME.$SERVERNAME.$DOMAIN:80/" $HTTPD_CONF
+    sed -i "124s|/var/www/html|$WEBSITEPATH|" $HTTPD_CONF sed -i
+    sed -i "129s|/var/www|$PARENTFOLDER|" $HTTPD_CONF
+    sed -i "136s|/var/www/html|$WEBSITEPATH|" $HTTPD_CONF
+    sed -i "149s/.*/Options FollowSymLinks/" $HTTPD_CONF
+    sed -i "156s/.*/AllowOverride All/" $HTTPD_CONF
+    sed -i "169s/.*/DirectoryIndex index.html index.php index.cgi/" $HTTPD_CONF
+    echo "# server's response header" >> $HTTPD_CONF
+    echo "ServerTokens Prod" >> $HTTPD_CONF
+
+    openssl req -x509 -nodes -days 365 -newkey rsa:4096 -keyout /etc/ssl/certs/httpd-selfsigned.key -out /etc/ssl/certs/httpd-selfsigned.crt
+
+    cat << EOF > /etc/httpd/conf.d/main.conf          
+<VirtualHost *:80>
+    ServerName $HOSTNAME.$SERVERNAME.$DOMAIN
+    ServerAlias www.$SERVERNAME.$DOMAIN
+    Redirect permanent / https://$HOSTNAME.$SERVERNAME.$DOMAIN/
+</VirtualHost>
+
+<VirtualHost *:80>
+    ServerName www.$SERVERNAME.$DOMAIN
+    Redirect permanent / https://www.$SERVERNAME.$DOMAIN/
+</VirtualHost>
+
+<VirtualHost _default_:443>
+    ServerName $HOSTNAME.$SERVERNAME.$DOMAIN
+    ServerAlias www.$SERVERNAME.$DOMAIN
+    DocumentRoot $WEBSITEPATH
+    SSLEngine On
+    SSLCertificateFile /etc/ssl/certs/httpd-selfsigned.crt
+    SSLCertificateKeyFile /etc/ssl/certs/httpd-selfsigned.key
+</VirtualHost>
+EOF
+
+    mkdir -p $WEBSITEPATH
+
+    firewall-cmd --permanent --add-service=http
+    firewall-cmd --permanent --add-service=https
+    firewall-cmd --reload
+
+    semanage fcontext -a -e /var/www $WEBSITEPATH
+    
+    # Don't forget to use these commands 
+    # when you're putting new file(s) in 
+    # your website path(s)
+    
+    restorecon -Rv $PARENTFOLDER
+    chcon -R -t httpd_sys_content_t $WEBSITEPATH
+    chown -R apache:apache $WEBSITEPATH
+    chmod -R 755 $WEBSITEPATH
+
+    echo -e "\n${GREEN}Httpd configuration done.${ENDCOLOR}\n"
 }
 
 mariaDB_configuration() {
-    echo -e "TEST2"
+    dnf install mariadb-server -y
+    systemctl start mariadb 
+    systemctl enable mariadb
+    mysql_secure_installation
+    # n, y, y, y, y, y
 }
 
 phpMyAdmin_configuration() {
-    echo -e "TEST3"
+    dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
 }
 
 #################
@@ -524,10 +640,9 @@ phpMyAdmin_configuration() {
 
 main() {
     check_root
-        
     while true; do 
         clear
-        echo -e "\n${BLUE}------${ENDCOLOR}"
+        echo -e "${BLUE}------${ENDCOLOR}"
         echo -e "${BLUE} Menu ${ENDCOLOR}"
         echo -e "${BLUE}------${ENDCOLOR}\n"
 
@@ -544,12 +659,12 @@ main() {
 
         case $CHOICE in 
             1) update_system; main; break ;;
-            2) global_configuration; main; break ;;
+            2) starting; global_configuration; main; break ;;
             3) ssh_configuration; main; break ;;
             4) add_services; break ;;
             5) backup_configuration; main; break ;;
             6) restore_backup; main; break ;;
-            7) update_system; global_configuration; ssh_configuration; backup_configuration; restore_backup; add_services; break ;;
+            7) starting; update_system; global_configuration; ssh_configuration; backup_configuration; restore_backup; add_services; break ;;
             7) echo -e "Ciao !"; break ;;
             *) echo -e "Invalid value, please try again";; 
         esac
