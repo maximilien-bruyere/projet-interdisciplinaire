@@ -41,6 +41,7 @@ GREEN="\e[32m"
 BLUE="\e[34m"
 ENDCOLOR="\e[0m"
 
+# Done
 check_root() {
     if [ "$EUID" -ne 0 ]; then
         echo -e "${RED}Please run as root.${ENDCOLOR}"
@@ -48,6 +49,7 @@ check_root() {
     fi
 }
 
+# Done
 starting() {
     clear
 
@@ -59,6 +61,8 @@ starting() {
 
         echo -e "To ensure that the configuration runs smoothly, we're going to ask you"
         echo -e "a few questions about the services we're going to set up.\n"
+
+        # 6 variables : HOSTNAME, SERVERNAME, DOMAIN, IPADDRESS, NETWORKADDRESS, SUBNETMASK
 
         read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME; echo "HOSTNAME=$HOSTNAME" > ./config.conf
         read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME;     echo "SERVERNAME=$SERVERNAME" >> ./config.conf
@@ -95,6 +99,7 @@ starting() {
     echo -e "\n${GREEN}File {config.conf} created.${ENDCOLOR}\n"
 }
 
+# Done
 update_system() {
     clear
     echo -e "${BLUE}------------${ENDCOLOR}"
@@ -107,6 +112,7 @@ update_system() {
     echo -e "\n${GREEN}Update done.${ENDCOLOR}\n"
 }
 
+# Done
 delete_users() {
     clear
     echo -e "${BLUE}----------------${ENDCOLOR}"
@@ -120,7 +126,7 @@ delete_users() {
     echo -e "\n${GREEN}User deleted.${ENDCOLOR}\n"
 }
 
-
+# Done
 global_configuration() {
     clear
     echo -e "\n${BLUE}--------------------------${ENDCOLOR}"
@@ -228,6 +234,7 @@ global_configuration() {
     echo -e "\n${GREEN}Configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 ssh_configuration() {
     clear
     echo -e "\n${BLUE}---------------------${ENDCOLOR}"
@@ -237,6 +244,7 @@ ssh_configuration() {
     while true; do 
         read -p "Choose port for ssh : " PORT
         if [[ $PORT -ge 1024 && $PORT -le 65535 ]]; then
+            echo "PORT=$PORT" >> ./config.conf
             break
         else
             echo -e "${RED}Invalid port, please try again.${ENDCOLOR}"
@@ -261,6 +269,7 @@ ssh_configuration() {
     echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
 }
 
+# Done
 backup_configuration() {
     clear
     echo -e "\n${BLUE}---------------${ENDCOLOR}"
@@ -302,7 +311,6 @@ rm -rf \$BACKUPPATH/\$TIMESTAMP/home
 rm -rf \$BACKUPPATH/\$TIMESTAMP/root
 
 echo -e ""
-
 EOF
     mkdir -p /root/.cache/crontab
     bash -c "(crontab -l 2>/dev/null; echo '0 12 * * * /sbin/dailybackup') | crontab -"
@@ -310,6 +318,7 @@ EOF
     echo -e "${GREEN}Backup configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 restore_backup() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
@@ -321,7 +330,6 @@ restore_backup() {
 
     cat <<EOF > /sbin/restorebackup
 #!/bin/bash
-
 read -p "Enter the path where the backups are stored : " BACKUPPATH
 echo -e "\nAvailable backups :\n"
 ls -1 \$BACKUPPATH
@@ -341,7 +349,6 @@ for dir in etc web var home root; do
     echo -e "Restoring \$BACKUP_FILE to /\$dir"
     tar -xzf "\$BACKUP_FILE" -C "/"
 done
-
 EOF
     echo -e "${GREEN}Backup restoration configuration completed.\n${ENDCOLOR}"
 }
@@ -350,6 +357,7 @@ EOF
 # SERVICES FUNCTIONS #
 ######################
 
+# Done
 add_services() {
 
     while true; do 
@@ -381,13 +389,14 @@ add_services() {
             6) httpd_configuration; add_services; break ;;
             7) mariaDB_configuration; add_services; break ;;
             8) phpMyAdmin_configuration; add_services; break ;;
-            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; mariaDB_configuration; php_configuration; break;;
+            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; break;;
             10) main; break;; 
             *) echo -e "Invalid value, please try again";; 
         esac
     done
 }
 
+# Done
 clamav_configuration() {
     clear 
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
@@ -415,12 +424,15 @@ clamav_configuration() {
     echo -e "\n${GREEN}ClamAV configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 fail2ban_configuration() {
     clear 
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}    Fail2Ban     ${ENDCOLOR}"
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    source ./config.conf
 
     dnf -y install fail2ban
 
@@ -429,32 +441,38 @@ fail2ban_configuration() {
 
     # Command to unban an IP : fail2ban-client set sshd unbanip [ip]
 
-    while true; do 
-        read -p "Enter port for ssh : " SSHPORT
-        if [[ $PORT -ge 1024 && $PORT -le 65535 ]]; then
-            break
-        else
-            echo -e "${RED}Invalid port, please try again.${ENDCOLOR}"
-        fi
-    done
-
     cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+    mv /etc/fail2ban/jail.conf /etc/fail2ban/jail.conf.bak
 
-    sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
-    sed -i "110s/5/3/" /etc/fail2ban/jail.local
-    sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
-    sed -i "279s/#//; 279s/normal/aggressive/" /etc/fail2ban/jail.local
-    sed -i "280s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
-    sed -i "283s/^$/enabled = true/" /etc/fail2ban/jail.local
-    sed -i "287s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
-    sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
-    sed -i "294s/ssh/$SSHPORT/" /etc/fail2ban/jail.local
-
+    # Condition si la variable $PORT existe dans le fichier ./config.conf 
+    if grep -q 'PORT' ./config.conf; then 
+        sed -i "92s/.*/ignoreip = 127.0.0.1/32 ::1 $NETWORKADDRESS/$SUBNETMASK" /etc/fail2ban/jail.local
+        sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
+        sed -i "110s/5/3/" /etc/fail2ban/jail.local
+        sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
+        sed -i "279s/#//; 279s/normal/aggressive/" /etc/fail2ban/jail.local
+        sed -i "280s/ssh/$PORT/" /etc/fail2ban/jail.local
+        sed -i "283s/^$/enabled = true/" /etc/fail2ban/jail.local
+        sed -i "287s/ssh/$PORT/" /etc/fail2ban/jail.local
+        sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
+        sed -i "294s/ssh/$PORT/" /etc/fail2ban/jail.local
+    else 
+        sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
+        sed -i "110s/5/3/" /etc/fail2ban/jail.local
+        sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
+        sed -i "279s/#//; 279s/normal/aggressive/" /etc/fail2ban/jail.local
+        sed -i "280s/ssh/22/" /etc/fail2ban/jail.local
+        sed -i "283s/^$/enabled = true/" /etc/fail2ban/jail.local
+        sed -i "287s/ssh/22/" /etc/fail2ban/jail.local
+        sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
+        sed -i "294s/ssh/22/" /etc/fail2ban/jail.local
+    fi 
     systemctl restart fail2ban
 
     echo -e "\n${GREEN}Fail2Ban configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 nmap_configuration() {
     clear
     source ./config.conf
@@ -463,18 +481,19 @@ nmap_configuration() {
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}-----------------${ENDCOLOR}\n"
 
+    source ./config.conf
+    
     dnf -y install nmap
 
     chmod 750 /usr/bin/nmap
     setfacl -m o::0 /usr/bin/nmap
-    echo -e "Choose the IP address to scan."
-    read -p "Enter the IP address : " IPADDRESS
 
     nmap $IPADDRESS 
 
     echo -e "\n${GREEN}Nmap configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 grub_configuration() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
@@ -496,6 +515,7 @@ grub_configuration() {
     echo -e "\n${GREEN}Grub configuration done.${ENDCOLOR}\n"
 }
 
+# Done
 fstab_configuration() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
@@ -563,6 +583,9 @@ httpd_configuration() {
     read -p "Enter where the website will be stored : " WEBSITEPATH
     read -p "Enter the parent folder of the website : " PARENTFOLDER
 
+    echo "WEBSITEPATH=$WEBSITEPATH" >> ./config.conf
+    echo "PARENTFOLDER=$PARENTFOLDER" >> ./config.conf
+
     HTTPD_CONF="/etc/httpd/conf/httpd.conf"
 
     cp $HTTPD_CONF $HTTPD_CONF.bak
@@ -580,7 +603,7 @@ httpd_configuration() {
 
     openssl req -x509 -nodes -days 365 -newkey rsa:4096 -keyout /etc/ssl/certs/httpd-selfsigned.key -out /etc/ssl/certs/httpd-selfsigned.crt
 
-    cat << EOF > /etc/httpd/conf.d/main.conf          
+    cat <<EOF > /etc/httpd/conf.d/main.conf          
 <VirtualHost *:80>
     ServerName $HOSTNAME.$SERVERNAME.$DOMAIN
     ServerAlias www.$SERVERNAME.$DOMAIN
@@ -619,7 +642,57 @@ EOF
     chown -R apache:apache $WEBSITEPATH
     chmod -R 755 $WEBSITEPATH
 
+    reload_website_path_command
+
     echo -e "\n${GREEN}Httpd configuration done.${ENDCOLOR}\n"
+}
+
+reload_website_path_command() {
+    source ./config.conf
+    dnf install -y inotify-tools
+    cat <<EOF > /sbin/monitor-website
+#!/bin/bash
+
+reload_website_path() {
+
+    restorecon -Rv $PARENTFOLDER
+    chcon -R -t httpd_sys_content_t $WEBSITEPATH
+    chown -R apache:apache $WEBSITEPATH
+    chmod -R 755 $WEBSITEPATH
+    systemctl restart httpd
+
+}
+
+monitor_website_path() {
+
+    while inotifywait -r -e modify,create,delete $WEBSITEPATH; do 
+        reload_website_path
+    done
+
+}
+
+monitor_website_path
+EOF
+
+    chmod 750 /sbin/monitor-website
+
+    cat <<DEL > /etc/systemd/system/monitor_website.service
+[Unit]
+Description=Monitor Website Path and Reload Configuration
+After=network.target
+
+[Service]
+ExecStart=/sbin/monitor-website
+Restart=alwais
+User=root
+
+[Install]
+WantedBy=multi-user.target
+DEL 
+    chmod +x /etc/systemd/system/monitor_website.service
+    systemctl daemon-reload
+    systemctl enable monitor_website.service
+    systemctl start monitor_website.service
 }
 
 mariaDB_configuration() {
@@ -634,10 +707,17 @@ phpMyAdmin_configuration() {
     dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
 }
 
+dns_configuration() {
+}
+
+dhcp_configuration() {
+}
+
 #################
 # MAIN FUNCTION #
 #################
 
+# Done
 main() {
     check_root
     while true; do 
@@ -665,7 +745,7 @@ main() {
             5) backup_configuration; main; break ;;
             6) restore_backup; main; break ;;
             7) starting; update_system; global_configuration; ssh_configuration; backup_configuration; restore_backup; add_services; break ;;
-            7) echo -e "Ciao !"; break ;;
+            8) echo -e "Ciao !"; break ;;
             *) echo -e "Invalid value, please try again";; 
         esac
     done 
