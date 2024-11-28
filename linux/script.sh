@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 # ID : 10092024
-# Author : Maximilien Bruyère
+# Author : Maximilien Bruyere
 # OS : Fedora 40 - Server Edition
 
 ###############
@@ -25,33 +25,59 @@
 # WARNINGS #
 ############
 #
-# Must be run after dos2unix command.
+# Optionnal : run dos2unix command on this file before starting it.
 # Must be run as root.
 # Must be run on a Fedora 40 Server Edition.
 # Must be run after the installation of the AD and DNS server (Windows Server 2019).
 #
 ############
 
-####################
-# GLOBAL FUNCTIONS #
-####################
-
 RED="\e[31m"
 GREEN="\e[32m"
 BLUE="\e[34m"
 ENDCOLOR="\e[0m"
 
-# Done
-check_root() {
+
+####################
+# GLOBAL FUNCTIONS #
+####################
+
+#######################################
+# Check if the script is run as root.
+# Globals:
+#   EUID
+# Arguments:
+#   None
+# Outputs:
+#   Error message if not run as root
+#######################################
+function check_root() {
     if [ "$EUID" -ne 0 ]; then
         echo -e "${RED}Please run as root.${ENDCOLOR}"
         exit
     fi
 }
 
-# Done
-starting() {
+
+#######################################
+# Start the script and gather user input.
+# Globals:
+#   HOSTNAME
+#   SERVERNAME
+#   DOMAIN
+#   IPADDRESS
+#   NETWORKADDRESS
+#   SUBNETMASK
+# Arguments:
+#   None
+# Outputs:
+#   Writes configuration to config.conf
+#######################################
+function starting() {
     clear
+    localectl set-keymap be
+    systemctl restart NetworkManager
+    nmcli connection down eth0; nmcli connection up eth0
 
     while true; do 
         clear
@@ -62,10 +88,8 @@ starting() {
         echo -e "To ensure that the configuration runs smoothly, we're going to ask you"
         echo -e "a few questions about the services we're going to set up.\n"
 
-        # 6 variables : HOSTNAME, SERVERNAME, DOMAIN, IPADDRESS, NETWORKADDRESS, SUBNETMASK
-
         read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME; echo "HOSTNAME=$HOSTNAME" > ./config.conf
-        read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME;     echo "SERVERNAME=$SERVERNAME" >> ./config.conf
+        read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME; echo "SERVERNAME=$SERVERNAME" >> ./config.conf
         read -p "Enter the domain (ex : .[lan]) : " DOMAIN; echo "DOMAIN=$DOMAIN" >> ./config.conf
 
         echo -e "\nHere is the informations about your Network."
@@ -99,8 +123,17 @@ starting() {
     echo -e "\n${GREEN}File {config.conf} created.${ENDCOLOR}\n"
 }
 
-# Done
-update_system() {
+
+#######################################
+# Update and upgrade the system.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   System update and upgrade messages
+#######################################
+function update_system() {
     clear
     echo -e "${BLUE}------------${ENDCOLOR}"
     echo -e "${BLUE}   Update   ${ENDCOLOR}"
@@ -112,8 +145,17 @@ update_system() {
     echo -e "\n${GREEN}Update done.${ENDCOLOR}\n"
 }
 
-# Done
-delete_users() {
+
+#######################################
+# Delete a user by UID.
+# Globals:
+#   UID
+# Arguments:
+#   None
+# Outputs:
+#   User deletion messages
+#######################################
+function delete_users() {
     clear
     echo -e "${BLUE}----------------${ENDCOLOR}"
     echo -e "${BLUE}   Delete User  ${ENDCOLOR}"
@@ -126,8 +168,22 @@ delete_users() {
     echo -e "\n${GREEN}User deleted.${ENDCOLOR}\n"
 }
 
-# Done
-global_configuration() {
+
+#######################################
+# Perform global configurations.
+# Globals:
+#   HOSTNAME
+#   SERVERNAME
+#   DOMAIN
+#   NUMBERPEOPLE
+#   USERNAME
+#   IPADDRESS
+# Arguments:
+#   None
+# Outputs:
+#   Configuration messages
+#######################################
+function global_configuration() {
     clear
     echo -e "\n${BLUE}--------------------------${ENDCOLOR}"
     echo -e "${BLUE}   Global Configurations  ${ENDCOLOR}"
@@ -139,8 +195,8 @@ global_configuration() {
     dnf -y install git
     hostnamectl set-hostname $HOSTNAME
     rm -rf /etc/resolv.conf
+    
     systemctl restart NetworkManager
-
     systemctl enable --now cockpit.socket
 
     echo -e "\n${GREEN}Hostname changed.${ENDCOLOR}\n"
@@ -161,6 +217,8 @@ global_configuration() {
         echo -e "\nUser number : $user"
         echo -e "----------------\n"
         read -p "What's the username number ? : [string] " USERNAME
+
+        # ssh-keygen -L -f [public key file] to see informations about this key
 
         if [ $(id -u $USERNAME) ]
         then
@@ -212,7 +270,7 @@ global_configuration() {
     echo -e "${RED}scp [user]@[server-ip]:/home/[user]/.ssh/id_rsa C:/users/[windows-user]/.ssh/${ENDCOLOR}"
     echo -e "${RED}Please, transfer the private keys to : ${ENDCOLOR}\n" 
 
-    # After the loop, please transfer the private keys generated
+    # After the loop, please transfer the generated private keys 
     # to the users who need them. 
     # To transfer them, use the scp command : 
     # scp -P [port] [user]@[server-ip]:/home/[user]/.ssh/id_rsa C:/users/[windows-user]/.ssh/
@@ -234,7 +292,18 @@ global_configuration() {
     echo -e "\n${GREEN}Configuration done.${ENDCOLOR}\n"
 }
 
-# Done
+
+#######################################
+# Configure SSH settings.
+# Globals:
+#   PORT
+#   NETWORKADDRESS
+#   SUBNETMASK
+# Arguments:
+#   None
+# Outputs:
+#   SSH configuration messages
+#######################################
 ssh_configuration() {
     clear
     echo -e "\n${BLUE}---------------------${ENDCOLOR}"
@@ -257,8 +326,16 @@ ssh_configuration() {
     sed -i "66s/#//" /etc/ssh/sshd_config
     sed -i "69s/#//; 69s/yes/no/" /etc/ssh/sshd_config
     sed -i "96s/#//; 96s/no/yes/" /etc/ssh/sshd_config
+    sed -i "s/#PermitRootLogin yes/PermitRootLogin no/" /etc/ssh/sshd_config
+
+    echo "auth required pam_faildelay.so delay=5000000" >> /etc/pam.d/sshd
 
     semanage port -a -t ssh_port_t -p tcp $PORT 
+
+    firewall-cmd --set-log-denied=all
+    firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='$NETWORKADDRESS/$SUBNETMASK' port port=$PORT protocol=tcp accept"
+    firewall-cmd --reload
+
 
     firewall-cmd --add-port=$PORT/tcp --permanent
     firewall-cmd --remove-service=ssh --permanent
@@ -269,8 +346,18 @@ ssh_configuration() {
     echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
 }
 
-# Done
-backup_configuration() {
+
+#######################################
+# Configure backup settings.
+# Globals:
+#   BACKUPPATH
+#   TIMESTAMP
+# Arguments:
+#   None
+# Outputs:
+#   Backup configuration messages
+#######################################
+function backup_configuration() {
     clear
     echo -e "\n${BLUE}---------------${ENDCOLOR}"
     echo -e "${BLUE}    Backup     ${ENDCOLOR}"
@@ -318,8 +405,19 @@ EOF
     echo -e "${GREEN}Backup configuration done.${ENDCOLOR}\n"
 }
 
-# Done
-restore_backup() {
+
+#######################################
+# Restore from a backup.
+# Globals:
+#   BACKUPPATH
+#   BACKUPDATE
+#   BACKUP_FILE
+# Arguments:
+#   None
+# Outputs:
+#   Backup restoration messages
+#######################################
+function restore_backup() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}  Restore Backup ${ENDCOLOR}"
@@ -353,12 +451,21 @@ EOF
     echo -e "${GREEN}Backup restoration configuration completed.\n${ENDCOLOR}"
 }
 
+
 ######################
 # SERVICES FUNCTIONS #
 ######################
 
-# Done
-add_services() {
+#######################################
+# Add and configure services.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Service configuration messages
+#######################################
+function add_services() {
 
     while true; do 
         clear
@@ -366,38 +473,138 @@ add_services() {
         echo -e "${BLUE}   Services    ${ENDCOLOR}"
         echo -e "${BLUE} configuration ${ENDCOLOR}"
         echo -e "${BLUE}---------------${ENDCOLOR}\n"
-
-        echo -e "1. ClamAV ${RED}[security]${ENDCOLOR}"
-        echo -e "2. Fail2ban ${RED}[security]${ENDCOLOR}"
-        echo -e "3. Grub ${RED}[security]${ENDCOLOR}"
-        echo -e "4. Fstab ${RED}[security]${ENDCOLOR}"
-        echo -e "5. Nmap ${RED}[security]${ENDCOLOR}"
-        echo -e "6. Httpd ${BLUE}[web]${ENDCOLOR}"
-        echo -e "7. MariaDB ${BLUE}[web]${ENDCOLOR}"
-        echo -e "8. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
-        echo -e "9. Automatic configuration"
-        echo -e "10. Previous menu\n"
+        
+        echo -e "1. Audit ${RED}[security]${ENDCOLOR}"
+        echo -e "2. Rootkit ${RED}[security]${ENDCOLOR}" 
+        echo -e "3. Security Tests ${RED}[security]${ENDCOLOR}"
+        echo -e "4. ClamAV ${RED}[security]${ENDCOLOR}"
+        echo -e "5. Fail2ban ${RED}[security]${ENDCOLOR}"
+        echo -e "6. Grub ${RED}[security]${ENDCOLOR}"
+        echo -e "7. Fstab ${RED}[security]${ENDCOLOR}"
+        echo -e "8. Nmap ${RED}[security]${ENDCOLOR}"
+        echo -e "9. Httpd ${BLUE}[web]${ENDCOLOR}"
+        echo -e "10. MariaDB ${BLUE}[web]${ENDCOLOR}"
+        echo -e "11. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
+        echo -e "12. Automatic configuration"
+        echo -e "13. Previous menu\n"
 
         read -p "Enter your choice : " CHOICESERVICE
 
         case $CHOICESERVICE in 
-            1) clamav_configuration; add_services; break ;;
-            2) fail2ban_configuration; add_services; break ;;
-            3) grub_configuration; add_services; break ;;
-            4) fstab_configuration; add_services; break ;;
-            5) nmap_configuration; add_services; break ;;
-            6) httpd_configuration; add_services; break ;;
-            7) mariaDB_configuration; add_services; break ;;
-            8) phpMyAdmin_configuration; add_services; break ;;
-            9) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; break;;
-            10) main; break;; 
+            1) audit_configuration; add_services; break;;
+            2) rootkit_configuration; add_services; break;;
+            3) security_tests; add_services; break;;
+            4) clamav_configuration; add_services; break ;;
+            5) fail2ban_configuration; add_services; break ;;
+            6) grub_configuration; add_services; break ;;
+            7) fstab_configuration; add_services; break ;;
+            8) nmap_configuration; add_services; break ;;
+            9) httpd_configuration; add_services; break ;;
+            10) mariaDB_configuration; add_services; break ;;
+            11) phpMyAdmin_configuration; add_services; break ;;
+            12) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; 
+            mariaDB_configuration; phpMyAdmin_configuration; audit_configuration; rootkit_configuration; security_tests; 
+            fstab_configuration; break;;
+            13) main; break;; 
             *) echo -e "Invalid value, please try again";; 
         esac
     done
 }
 
-# Done
-clamav_configuration() {
+
+#######################################
+# Configure audit settings.
+# Globals:
+#   WEBSITEPATH
+# Arguments:
+#   None
+# Outputs:
+#   Audit configuration messages
+#######################################
+function audit_configuration() {
+    clear 
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      Audit      ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    source ./config.conf
+
+    dnf install audit -y
+    systemctl enable --now auditd
+
+    # ausearch -k [name_changes]
+    auditctl -w /etc/passwd -p wa -k passwd_changes
+    auditctl -w /etc/shadow -p wa -k shadow_changes
+    auditctl -w $WEBSITEPATH -p wa -k web_changes
+    auditctl -w /etc/ssh/sshd_config -p wa -k ssh_changes
+
+    echo -e "${GREEN}Audit configuration completed.\n${ENDCOLOR}"
+}
+
+
+#######################################
+# Configure rootkit detection.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Rootkit configuration messages
+#######################################
+function rootkit_configuration() {
+    clear 
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}     RootKit     ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf install rkhunter chkrootkit -y
+    
+    echo -e "\n${RED}[INFO]${ENDCOLOR} 'rkhunter --update' may take several minutes\n"
+    rkhunter --update
+    rkhunter --check
+    chkrootkit
+
+    echo -e "${GREEN}Rootkit configuration completed.\n${ENDCOLOR}"
+}
+
+
+#######################################
+# Perform security tests.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Security test messages
+#######################################
+function security_tests() {
+    clear 
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      Lynis      ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf install lynis -y
+    lynis audit system
+
+    # To get last lines : tail -n 26 /var/log/lynis.log
+    bash -c "(crontab -l 2>/dev/null; echo '30 12 * * * lynis audit system >> /var/log/lynis.log') | crontab -"
+    echo -e "${GREEN}Security Tests [Lynis] configuration completed.\n${ENDCOLOR}"
+}
+
+
+#######################################
+# Configure ClamAV antivirus.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   ClamAV configuration messages
+#######################################
+function clamav_configuration() {
     clear 
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}     ClamAV      ${ENDCOLOR}"
@@ -424,8 +631,19 @@ clamav_configuration() {
     echo -e "\n${GREEN}ClamAV configuration done.${ENDCOLOR}\n"
 }
 
-# Done
-fail2ban_configuration() {
+
+#######################################
+# Configure Fail2Ban.
+# Globals:
+#   NETWORKADDRESS
+#   SUBNETMASK
+#   PORT
+# Arguments:
+#   None
+# Outputs:
+#   Fail2Ban configuration messages
+#######################################
+function fail2ban_configuration() {
     clear 
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}    Fail2Ban     ${ENDCOLOR}"
@@ -444,7 +662,7 @@ fail2ban_configuration() {
     cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
     mv /etc/fail2ban/jail.conf /etc/fail2ban/jail.conf.bak
 
-    # Condition si la variable $PORT existe dans le fichier ./config.conf 
+    # If $PORT is known in ./config.conf file
     if grep -q 'PORT' ./config.conf; then 
         sed -i "92s/.*/ignoreip = 127.0.0.1/32 ::1 $NETWORKADDRESS/$SUBNETMASK" /etc/fail2ban/jail.local
         sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
@@ -457,7 +675,8 @@ fail2ban_configuration() {
         sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
         sed -i "294s/ssh/$PORT/" /etc/fail2ban/jail.local
     else 
-        sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
+        sed -i "92s/.*/ignoreip = 127.0.0.1/32 ::1 $NETWORKADDRESS/$SUBNETMASK" /etc/fail2ban/jail.local
+        sed -i "103s/10m/1d/" /etc/fail2ban/jail.local 
         sed -i "110s/5/3/" /etc/fail2ban/jail.local
         sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
         sed -i "279s/#//; 279s/normal/aggressive/" /etc/fail2ban/jail.local
@@ -472,8 +691,17 @@ fail2ban_configuration() {
     echo -e "\n${GREEN}Fail2Ban configuration done.${ENDCOLOR}\n"
 }
 
-# Done
-nmap_configuration() {
+
+#######################################
+# Configure Nmap.
+# Globals:
+#   IPADDRESS 
+# Arguments:
+#   None
+# Outputs:
+#   Nmap configuration messages
+#######################################
+function nmap_configuration() {
     clear
     source ./config.conf
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
@@ -493,8 +721,18 @@ nmap_configuration() {
     echo -e "\n${GREEN}Nmap configuration done.${ENDCOLOR}\n"
 }
 
-# Done
-grub_configuration() {
+
+#######################################
+# Configure GRUB settings.
+# Globals:
+#   USERNAMEGRUB
+#   PASSWORDGRUB
+# Arguments:
+#   None
+# Outputs:
+#   GRUB configuration messages
+#######################################
+function grub_configuration() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}      Grub       ${ENDCOLOR}"
@@ -515,8 +753,17 @@ grub_configuration() {
     echo -e "\n${GREEN}Grub configuration done.${ENDCOLOR}\n"
 }
 
-# Done
-fstab_configuration() {
+#######################################
+# Configure fstab settings.
+# Globals:
+#   MOUNTINGOPTIONS
+#   partition
+# Arguments:
+#   None
+# Outputs:
+#   Fstab configuration messages
+#######################################
+function fstab_configuration() {
     clear
     echo -e "\n${BLUE}-----------------${ENDCOLOR}"
     echo -e "${BLUE}     Fstab       ${ENDCOLOR}"
@@ -563,14 +810,56 @@ fstab_configuration() {
     shutdown -r now
 }
 
-httpd_configuration() {
 
-    # YOU NEED TO DESACTIVATE IPV6 
+#######################################
+# Configure FTP settings.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   None
+#######################################
+function ftp_configuration() {
+}
 
-    echo -e "${BLUE}---------------{ENDCOLOR}"
-    echo -e "${BLUE}     Httpd     {ENDCOLOR}"
-    echo -e "${BLUE} Configuration {ENDCOLOR}"
-    echo -e "${BLUE}---------------{ENDCOLOR}\n"
+
+#######################################
+# Configure quota settings.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   None
+#######################################
+function quota_configuration() {
+}
+
+
+#######################################
+# Configure HTTPD settings.
+# Globals:
+#   WEBSITEPATH
+#   PARENTFOLDER
+#   HTTPD_CONF
+#   IPADDRESS
+#   HOSTNAME
+#   SERVERNAME
+#   DOMAIN
+# Arguments:
+#   None
+# Outputs:
+#   HTTPD configuration messages
+#######################################
+function httpd_configuration() {
+
+    # You need to desactivate IPV6
+    clear 
+    echo -e "${BLUE}---------------${ENDCOLOR}"
+    echo -e "${BLUE}     HTTPD     ${ENDCOLOR}"
+    echo -e "${BLUE} Configuration ${ENDCOLOR}"
+    echo -e "${BLUE}---------------${ENDCOLOR}\n"
 
     source ./config.conf
 
@@ -606,8 +895,7 @@ httpd_configuration() {
     cat <<EOF > /etc/httpd/conf.d/main.conf          
 <VirtualHost *:80>
     ServerName $HOSTNAME.$SERVERNAME.$DOMAIN
-    ServerAlias www.$SERVERNAME.$DOMAIN
-    Redirect permanent / https://$HOSTNAME.$SERVERNAME.$DOMAIN/
+    Redirect permanent / https://www.$SERVERNAME.$DOMAIN/
 </VirtualHost>
 
 <VirtualHost *:80>
@@ -616,8 +904,7 @@ httpd_configuration() {
 </VirtualHost>
 
 <VirtualHost _default_:443>
-    ServerName $HOSTNAME.$SERVERNAME.$DOMAIN
-    ServerAlias www.$SERVERNAME.$DOMAIN
+    ServerName www.$SERVERNAME.$DOMAIN
     DocumentRoot $WEBSITEPATH
     SSLEngine On
     SSLCertificateFile /etc/ssl/certs/httpd-selfsigned.crt
@@ -627,12 +914,14 @@ EOF
 
     mkdir -p $WEBSITEPATH
 
-    firewall-cmd --permanent --add-service=http
-    firewall-cmd --permanent --add-service=https
+    firewall-cmd --permanent --add-service=http 
+    firewall-cmd --permanent --add-service=https 
     firewall-cmd --reload
+
 
     semanage fcontext -a -e /var/www $WEBSITEPATH
     
+    # Old comments ;
     # Don't forget to use these commands 
     # when you're putting new file(s) in 
     # your website path(s)
@@ -647,28 +936,41 @@ EOF
     echo -e "\n${GREEN}Httpd configuration done.${ENDCOLOR}\n"
 }
 
+#######################################
+# Reload website path configuration.
+# Globals:
+#   PARENTFOLDER
+#   WEBSITEPATH
+# Arguments:
+#   None
+# Outputs:
+#   None
+#######################################
 reload_website_path_command() {
+    
+    clear
+    echo -e "${BLUE}-------------------------${ENDCOLOR}"
+    echo -e "${BLUE}     Reload Websites     ${ENDCOLOR}"
+    echo -e "${BLUE}      Configuration      ${ENDCOLOR}"
+    echo -e "${BLUE}-------------------------${ENDCOLOR}\n"
+
     source ./config.conf
     dnf install -y inotify-tools
     cat <<EOF > /sbin/monitor-website
 #!/bin/bash
 
 reload_website_path() {
-
     restorecon -Rv $PARENTFOLDER
     chcon -R -t httpd_sys_content_t $WEBSITEPATH
     chown -R apache:apache $WEBSITEPATH
     chmod -R 755 $WEBSITEPATH
     systemctl restart httpd
-
 }
 
 monitor_website_path() {
-
     while inotifywait -r -e modify,create,delete $WEBSITEPATH; do 
         reload_website_path
     done
-
 }
 
 monitor_website_path
@@ -688,37 +990,76 @@ User=root
 
 [Install]
 WantedBy=multi-user.target
-DEL 
+DEL
     chmod +x /etc/systemd/system/monitor_website.service
     systemctl daemon-reload
     systemctl enable monitor_website.service
     systemctl start monitor_website.service
 }
 
-mariaDB_configuration() {
-    dnf install mariadb-server -y
+
+#######################################
+# Configure MariaDB settings.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   MariaDB configuration messages
+#######################################
+function mariaDB_configuration() {
+    clear
+    echo -e "${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}     MariaDB     ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    dnf install mariadb-server mariadb -y
     systemctl start mariadb 
     systemctl enable mariadb
+    echo -e "You should answer by n, n, y, y, y, y and then y"
+
     mysql_secure_installation
-    # n, y, y, y, y, y
+    echo -e "\n${GREEN}MariaDB configuration done.${ENDCOLOR}\n"
 }
 
-phpMyAdmin_configuration() {
+
+#######################################
+# Configure PHPMyAdmin settings.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   PHPMyAdmin configuration messages
+#######################################
+function phpMyAdmin_configuration() {
+    clear
+    echo -e "${BLUE}---------------${ENDCOLOR}"
+    echo -e "${BLUE}      PHP      ${ENDCOLOR}"
+    echo -e "${BLUE} Configuration ${ENDCOLOR}"
+    echo -e "${BLUE}---------------${ENDCOLOR}\n"
+
     dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
+
+    echo -e "\n${GREEN}PHP configuration done.${ENDCOLOR}\n"
 }
 
-dns_configuration() {
-}
-
-dhcp_configuration() {
-}
 
 #################
 # MAIN FUNCTION #
 #################
 
-# Done
-main() {
+#######################################
+# Main function to display the menu.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Menu display and user input handling
+#######################################
+function main() {
     check_root
     while true; do 
         clear
@@ -744,7 +1085,8 @@ main() {
             4) add_services; break ;;
             5) backup_configuration; main; break ;;
             6) restore_backup; main; break ;;
-            7) starting; update_system; global_configuration; ssh_configuration; backup_configuration; restore_backup; add_services; break ;;
+            7) starting; update_system; global_configuration; ssh_configuration; 
+            backup_configuration; restore_backup; add_services; break ;;
             8) echo -e "Ciao !"; break ;;
             *) echo -e "Invalid value, please try again";; 
         esac
