@@ -88,8 +88,10 @@ function starting() {
     clear
     
     localectl set-keymap be
-    systemctl restart NetworkManager
+    nmcli connection modify eth0 ipv6.method "disabled"
     nmcli connection down eth0; nmcli connection up eth0
+    systemctl restart NetworkManager
+
     systemctl enable --now cockpit.socket
 
     while true; do 
@@ -783,8 +785,7 @@ function fstab_configuration() {
         echo -e "Partition : $second_column"
         echo -e "----------------\n"
 
-        read -p "Enter the mounting options (ex : defaults,nodev,noexec,...) : " MOUNTINGOPTIONS
-
+        read -p "Enter the mounting options (ex : defaults,nodev,noexec,usrquota,grpquota, ...) : " MOUNTINGOPTIONS
         case $second_column in
 
             /) sed -i "${partition}s/defaults/$MOUNTINGOPTIONS/" /etc/fstab ;;
@@ -880,10 +881,17 @@ function quota_configuration() {
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}-----------------${ENDCOLOR}\n"
 
-    quotaon 
-    quotacheck
+    quotaon -avug
+    quotacheck -avug
+
+    # ADD QUOTAS TO USERS 
+    # setquota -u [username] [x_soft_blocks x_hard_blocks] [x_soft_inodes x_hard_inodes] [WHERE YOU WANT TO SETQUOTA]
+    # setquota -g [groupname] [x_soft_blocks x_hard_blocks] [x_soft_inodes x_hard_inodes] [WHERE YOU WANT TO SETQUOTA]
+    # quota -v (for verbose) -s (for human-readable) -u [user] to see what range of quotas you give to him
 
     echo -e "\n${GREEN}Quota configuration done.${ENDCOLOR}\n"
+
+    read -p "Press any key to continue... " -n1 -s
 }
 
 
@@ -1169,22 +1177,25 @@ function add_services() {
         echo -e "${BLUE}---------------${ENDCOLOR}\n"
         
         echo -e "1. Audit ${RED}[security]${ENDCOLOR}"
-        echo -e "2. Rootkit ${RED}[security]${ENDCOLOR}" 
+        echo -e "2. Rootkit (NOT AUTO) ${RED}[security]${ENDCOLOR}" 
         echo -e "3. Security Tests ${RED}[security]${ENDCOLOR}"
         echo -e "4. ClamAV ${RED}[security]${ENDCOLOR}"
         echo -e "5. Fail2ban ${RED}[security]${ENDCOLOR}"
-        echo -e "6. Grub ${RED}[security]${ENDCOLOR}"
-        echo -e "7. Fstab ${RED}[security]${ENDCOLOR}"
+        echo -e "6. Grub (NOT AUTO) ${RED}[security]${ENDCOLOR}"
+        echo -e "7. Fstab (NOT AUTO) ${RED}[security]${ENDCOLOR}"
         echo -e "8. Nmap ${RED}[security]${ENDCOLOR}"
-        echo -e "9. Httpd ${BLUE}[web]${ENDCOLOR}"
-        echo -e "10. MariaDB ${BLUE}[web]${ENDCOLOR}"
-        echo -e "11. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
-        echo -e "12. Automatic configuration"
-        echo -e "13. Previous menu\n"
+        echo -e "9. Quota (NOT AUTO) ${RED}[security]${ENDCOLOR}"
+        echo -e "10. FTP ${BLUE}[File Transfert]${ENDCOLOR}"
+        echo -e "11. Httpd ${BLUE}[web]${ENDCOLOR}"
+        echo -e "12. MariaDB ${BLUE}[web]${ENDCOLOR}"
+        echo -e "13. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
+        echo -e "14. Automatic configuration"
+        echo -e "15. Previous menu\n"
+
+        echo -e "\n${RED}Note: we recommend that you run the 'grub' & 'fstab' \ncommand before executing the other commands,
+        \n'ftp' command after 'httpd' command${ENDCOLOR}"
 
         read -p "Enter your choice : " CHOICESERVICE
-
-        echo -e "\n${RED}Note: we recommend that you run the 'fstab' \ncommand before executing the other commands.${ENDCOLOR}"
 
         case $CHOICESERVICE in 
             1) audit_configuration; add_services; break;;
@@ -1195,13 +1206,15 @@ function add_services() {
             6) grub_configuration; add_services; break ;;
             7) fstab_configuration; add_services; break ;;
             8) nmap_configuration; add_services; break ;;
-            9) httpd_configuration; add_services; break ;;
-            10) mariaDB_configuration; add_services; break ;;
-            11) phpMyAdmin_configuration; add_services; break ;;
-            12) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; 
-            mariaDB_configuration; phpMyAdmin_configuration; audit_configuration; rootkit_configuration; security_tests; 
+            9) quota_configuration; add_services; break;;
+            10) ftp_configuration; add_services; break;;
+            11) httpd_configuration; add_services; break ;;
+            12) mariaDB_configuration; add_services; break ;;
+            13) phpMyAdmin_configuration; add_services; break ;;
+            14) clamav_configuration; fail2ban_configuration; nmap_configuration; httpd_configuration; 
+            mariaDB_configuration; phpMyAdmin_configuration; audit_configuration; security_tests; 
             ftp_configuration; break;;
-            13) main; break;; 
+            15) main; break;; 
             *) echo -e "Invalid value, please try again";; 
         esac
     done
