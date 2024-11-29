@@ -21,6 +21,18 @@
 #
 ###############
 
+###########
+# SOURCES #
+###########
+#
+# BASH DOC STRINGS : https://google.github.io/styleguide/shellguide.html
+# SERVICES ON FEDORA : https://www.server-world.info/en/
+# DOCUMENTATIONS : https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9
+# FUNCTIONS ON REDHAT DISTR. : https://github.com/maximilien-bruyere/projet_linux
+# DOWNLOADED APP. : FileZilla, PuttyGen, Termius.
+#
+###########
+
 ############
 # WARNINGS #
 ############
