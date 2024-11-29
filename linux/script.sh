@@ -37,7 +37,6 @@ GREEN="\e[32m"
 BLUE="\e[34m"
 ENDCOLOR="\e[0m"
 
-
 ####################
 # GLOBAL FUNCTIONS #
 ####################
@@ -75,9 +74,11 @@ function check_root() {
 #######################################
 function starting() {
     clear
+    
     localectl set-keymap be
     systemctl restart NetworkManager
     nmcli connection down eth0; nmcli connection up eth0
+    systemctl enable --now cockpit.socket
 
     while true; do 
         clear
@@ -105,7 +106,7 @@ function starting() {
         cat ./config.conf
         echo -e ""
         while true; do
-            read -p "Is it good for you [yes/no] ?" YESORNO
+            read -p "Is it good for you [yes/no] ? " YESORNO
             if [[ $YESORNO == "yes" || $YESORNO == "no" ]]
             then
                 break
@@ -216,7 +217,7 @@ function global_configuration() {
     for (( user=1; user<=$NUMBERPEOPLE; user++ )); do 
         echo -e "\nUser number : $user"
         echo -e "----------------\n"
-        read -p "What's the username number ? : [string] " USERNAME
+        read -p "What's the username ? : [string] " USERNAME
 
         # ssh-keygen -L -f [public key file] to see informations about this key
 
@@ -225,9 +226,22 @@ function global_configuration() {
             echo -e "${RED}This username already exists.${ENDCOLOR}"
             sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$IPADDRESS"
             mv /home/$USERNAME/.ssh/id_rsa.pub /home/$USERNAME/.ssh/authorized_keys
-
             users_list+=($USERNAME)
+            while true; do 
+                read -p "Does this person need to be an ftp user only ? [no/yes] " FTP
 
+                if [[ $FTP == "yes" || $FTP == "no" ]]
+                then
+                    break
+                else
+                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                fi
+            done
+
+            if [[ $FTP == "yes" ]]
+            then
+                echo -e "USER${user}=$USERNAME" >> ./config.conf
+            fi
             continue
         fi 
 
@@ -240,7 +254,7 @@ function global_configuration() {
             else
                 echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
             fi
-        done 
+        done
 
         if [[ $ACCESSCHOICE == "yes" ]]
         then 
@@ -252,7 +266,21 @@ function global_configuration() {
 
             sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$HOSTNAME.$SERVERNAME.$DOMAIN"
             mv /home/$USERNAME/.ssh/id_rsa.pub /home/$USERNAME/.ssh/authorized_keys
+            while true; do 
+                read -p "Does this person need to be an ftp user only ? [no/yes] " FTP
 
+                if [[ $FTP == "yes" || $FTP == "no" ]]
+                then
+                    break
+                else
+                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                fi
+            done
+
+            if [[ $FTP == "yes" ]]
+            then
+                echo -e "USER${user}=$USERNAME" >> ./config.conf
+            fi
         else 
             useradd -m $USERNAME
             passwd $USERNAME
@@ -261,6 +289,22 @@ function global_configuration() {
 
             sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$HOSTNAME.$SERVERNAME.$DOMAIN"
             mv /home/$USERNAME/.ssh/id_rsa.pub /home/$USERNAME/.ssh/authorized_keys
+
+            while true; do 
+                read -p "Does this person need to be an ftp user only ? [no/yes] " FTP
+
+                if [[ $FTP == "yes" || $FTP == "no" ]]
+                then
+                    break
+                else
+                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                fi
+            done
+
+            if [[ $FTP == "yes" ]]
+            then
+                echo -e "USER${user}=$USERNAME" >> ./config.conf
+            fi
         fi 
     done
 
@@ -452,66 +496,6 @@ EOF
 }
 
 
-######################
-# SERVICES FUNCTIONS #
-######################
-
-#######################################
-# Add and configure services.
-# Globals:
-#   None
-# Arguments:
-#   None
-# Outputs:
-#   Service configuration messages
-#######################################
-function add_services() {
-
-    while true; do 
-        clear
-        echo -e "\n${BLUE}---------------${ENDCOLOR}"
-        echo -e "${BLUE}   Services    ${ENDCOLOR}"
-        echo -e "${BLUE} configuration ${ENDCOLOR}"
-        echo -e "${BLUE}---------------${ENDCOLOR}\n"
-        
-        echo -e "1. Audit ${RED}[security]${ENDCOLOR}"
-        echo -e "2. Rootkit ${RED}[security]${ENDCOLOR}" 
-        echo -e "3. Security Tests ${RED}[security]${ENDCOLOR}"
-        echo -e "4. ClamAV ${RED}[security]${ENDCOLOR}"
-        echo -e "5. Fail2ban ${RED}[security]${ENDCOLOR}"
-        echo -e "6. Grub ${RED}[security]${ENDCOLOR}"
-        echo -e "7. Fstab ${RED}[security]${ENDCOLOR}"
-        echo -e "8. Nmap ${RED}[security]${ENDCOLOR}"
-        echo -e "9. Httpd ${BLUE}[web]${ENDCOLOR}"
-        echo -e "10. MariaDB ${BLUE}[web]${ENDCOLOR}"
-        echo -e "11. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
-        echo -e "12. Automatic configuration"
-        echo -e "13. Previous menu\n"
-
-        read -p "Enter your choice : " CHOICESERVICE
-
-        case $CHOICESERVICE in 
-            1) audit_configuration; add_services; break;;
-            2) rootkit_configuration; add_services; break;;
-            3) security_tests; add_services; break;;
-            4) clamav_configuration; add_services; break ;;
-            5) fail2ban_configuration; add_services; break ;;
-            6) grub_configuration; add_services; break ;;
-            7) fstab_configuration; add_services; break ;;
-            8) nmap_configuration; add_services; break ;;
-            9) httpd_configuration; add_services; break ;;
-            10) mariaDB_configuration; add_services; break ;;
-            11) phpMyAdmin_configuration; add_services; break ;;
-            12) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; 
-            mariaDB_configuration; phpMyAdmin_configuration; audit_configuration; rootkit_configuration; security_tests; 
-            fstab_configuration; break;;
-            13) main; break;; 
-            *) echo -e "Invalid value, please try again";; 
-        esac
-    done
-}
-
-
 #######################################
 # Configure audit settings.
 # Globals:
@@ -664,7 +648,7 @@ function fail2ban_configuration() {
 
     # If $PORT is known in ./config.conf file
     if grep -q 'PORT' ./config.conf; then 
-        sed -i "92s/.*/ignoreip = 127.0.0.1/32 ::1 $NETWORKADDRESS/$SUBNETMASK" /etc/fail2ban/jail.local
+        sed -i "92s|.*|ignoreip = 127.0.0.1/32 $NETWORKADDRESS/$SUBNETMASK|" /etc/fail2ban/jail.local
         sed -i "103s/10m/1d/" /etc/fail2ban/jail.local
         sed -i "110s/5/3/" /etc/fail2ban/jail.local
         sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
@@ -675,7 +659,7 @@ function fail2ban_configuration() {
         sed -i "293s/^$/enabled = true/" /etc/fail2ban/jail.local
         sed -i "294s/ssh/$PORT/" /etc/fail2ban/jail.local
     else 
-        sed -i "92s/.*/ignoreip = 127.0.0.1/32 ::1 $NETWORKADDRESS/$SUBNETMASK" /etc/fail2ban/jail.local
+        sed -i "92s|.*|ignoreip = 127.0.0.1/32 $NETWORKADDRESS/$SUBNETMASK|" /etc/fail2ban/jail.local
         sed -i "103s/10m/1d/" /etc/fail2ban/jail.local 
         sed -i "110s/5/3/" /etc/fail2ban/jail.local
         sed -i "162s/normal/aggressive/" /etc/fail2ban/jail.local
@@ -739,7 +723,7 @@ function grub_configuration() {
     echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
     echo -e "${BLUE}-----------------${ENDCOLOR}\n"
     
-    # use this function before changing /etc/fstab
+    # Use this function before changing /etc/fstab
     read -p "Enter the username : " USERNAMEGRUB
     echo -n "Enter the password : " && read -s PASSWORDGRUB && echo
 
@@ -752,6 +736,7 @@ function grub_configuration() {
 
     echo -e "\n${GREEN}Grub configuration done.${ENDCOLOR}\n"
 }
+
 
 #######################################
 # Configure fstab settings.
@@ -821,6 +806,49 @@ function fstab_configuration() {
 #   None
 #######################################
 function ftp_configuration() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      SFTP       ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    source ./config.conf
+
+    echo -e "Let's create group for ftp\n"
+    read -p "Give me the name you want to : " GROUPNAME
+
+    groupadd $GROUPNAME
+
+    echo -e "Match Group $GROUPNAME
+    ChrootDirectory /home/%u
+    ForceCommand internal-sftp
+    AllowTcpForwarding no
+    X11Forwarding no" >> /etc/ssh/sshd_config
+
+    sed -i "123s|/usr/libexec/openssh/sftp-server|internal-sftp|" /etc/ssh/sshd_config
+
+    local usernames=($(retrieve_usernames))
+
+    for username in "${usernames[@]}"; do
+
+        chown root:root /home/$username
+        chmod 755 /home/$username
+        mkdir -p /home/$username/data
+        chown $username:$username /home/$username/data
+        chmod 700 /home/$username/data
+
+        mkdir -p /home/$username/shared
+        mount --bind $WEBSITEPATH /home/$username/shared
+        echo "/web/site /home/$username/shared none bind 0 0" >> /etc/fstab
+        systemctl daemon-reload
+        usermod -aG apache $username
+        usermod -aG $GROUPNAME $username
+        systemctl restart sshd
+
+    done
+    
+    
+    echo -e "\n${GREEN}FTP configuration done.${ENDCOLOR}\n"
 }
 
 
@@ -834,6 +862,16 @@ function ftp_configuration() {
 #   None
 #######################################
 function quota_configuration() {
+    clear
+    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
+    echo -e "${BLUE}      Quota      ${ENDCOLOR}"
+    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
+    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+
+    quotaon 
+    quotacheck
+
+    echo -e "\n${GREEN}Quota configuration done.${ENDCOLOR}\n"
 }
 
 
@@ -929,12 +967,58 @@ EOF
     restorecon -Rv $PARENTFOLDER
     chcon -R -t httpd_sys_content_t $WEBSITEPATH
     chown -R apache:apache $WEBSITEPATH
-    chmod -R 755 $WEBSITEPATH
+    chmod -R 770 $WEBSITEPATH
+
+    add_users_to_apache_group
 
     reload_website_path_command
 
     echo -e "\n${GREEN}Httpd configuration done.${ENDCOLOR}\n"
 }
+
+
+#######################################
+# Retrieve usernames from config.conf.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   List of usernames
+#######################################
+function retrieve_usernames() {
+    local config_file="./config.conf"
+    local usernames=()
+
+    while IFS= read -r line; do
+        if [[ $line =~ ^USER[0-9]+= ]]; then
+            username=$(echo $line | cut -d'=' -f2)
+            usernames+=("$username")
+        fi
+    done < "$config_file"
+
+    echo "${usernames[@]}"
+}
+
+
+#######################################
+# Add users to the apache group.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Messages indicating the users added to the apache group
+#######################################
+function add_users_to_apache_group() {
+    local usernames=($(retrieve_usernames))
+
+    for username in "${usernames[@]}"; do
+        usermod -aG apache "$username"
+        echo "User $username added to the apache group."
+    done
+}
+
 
 #######################################
 # Reload website path configuration.
@@ -946,7 +1030,7 @@ EOF
 # Outputs:
 #   None
 #######################################
-reload_website_path_command() {
+function reload_website_path_command() {
     
     clear
     echo -e "${BLUE}-------------------------${ENDCOLOR}"
@@ -963,7 +1047,7 @@ reload_website_path() {
     restorecon -Rv $PARENTFOLDER
     chcon -R -t httpd_sys_content_t $WEBSITEPATH
     chown -R apache:apache $WEBSITEPATH
-    chmod -R 755 $WEBSITEPATH
+    chmod -R 775 $WEBSITEPATH
     systemctl restart httpd
 }
 
@@ -1041,8 +1125,74 @@ function phpMyAdmin_configuration() {
     echo -e "${BLUE}---------------${ENDCOLOR}\n"
 
     dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
+    dnf install phpmyadmin -y
+
+    sed -i "14s|local|all granted|" /etc/httpd/conf.d/phpMyAdmin.conf
+    sed -i "18s|local|all granted|" /etc/httpd/conf.d/phpMyAdmin.conf
 
     echo -e "\n${GREEN}PHP configuration done.${ENDCOLOR}\n"
+}
+
+
+######################
+# SERVICES FUNCTIONS #
+######################
+
+#######################################
+# Add and configure services.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Service configuration messages
+#######################################
+function add_services() {
+
+    while true; do 
+        clear
+        echo -e "\n${BLUE}---------------${ENDCOLOR}"
+        echo -e "${BLUE}   Services    ${ENDCOLOR}"
+        echo -e "${BLUE} configuration ${ENDCOLOR}"
+        echo -e "${BLUE}---------------${ENDCOLOR}\n"
+        
+        echo -e "1. Audit ${RED}[security]${ENDCOLOR}"
+        echo -e "2. Rootkit ${RED}[security]${ENDCOLOR}" 
+        echo -e "3. Security Tests ${RED}[security]${ENDCOLOR}"
+        echo -e "4. ClamAV ${RED}[security]${ENDCOLOR}"
+        echo -e "5. Fail2ban ${RED}[security]${ENDCOLOR}"
+        echo -e "6. Grub ${RED}[security]${ENDCOLOR}"
+        echo -e "7. Fstab ${RED}[security]${ENDCOLOR}"
+        echo -e "8. Nmap ${RED}[security]${ENDCOLOR}"
+        echo -e "9. Httpd ${BLUE}[web]${ENDCOLOR}"
+        echo -e "10. MariaDB ${BLUE}[web]${ENDCOLOR}"
+        echo -e "11. PhpMyAdmin ${BLUE}[web]${ENDCOLOR}"
+        echo -e "12. Automatic configuration"
+        echo -e "13. Previous menu\n"
+
+        read -p "Enter your choice : " CHOICESERVICE
+
+        echo -e "\n${RED}Note: we recommend that you run the 'fstab' \ncommand before executing the other commands.${ENDCOLOR}"
+
+        case $CHOICESERVICE in 
+            1) audit_configuration; add_services; break;;
+            2) rootkit_configuration; add_services; break;;
+            3) security_tests; add_services; break;;
+            4) clamav_configuration; add_services; break ;;
+            5) fail2ban_configuration; add_services; break ;;
+            6) grub_configuration; add_services; break ;;
+            7) fstab_configuration; add_services; break ;;
+            8) nmap_configuration; add_services; break ;;
+            9) httpd_configuration; add_services; break ;;
+            10) mariaDB_configuration; add_services; break ;;
+            11) phpMyAdmin_configuration; add_services; break ;;
+            12) clamav_configuration; fail2ban_configuration; grub_configuration; nmap_configuration; httpd_configuration; 
+            mariaDB_configuration; phpMyAdmin_configuration; audit_configuration; rootkit_configuration; security_tests; 
+            ftp_configuration; break;;
+            13) main; break;; 
+            *) echo -e "Invalid value, please try again";; 
+        esac
+    done
 }
 
 
