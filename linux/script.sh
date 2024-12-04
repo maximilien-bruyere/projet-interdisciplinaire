@@ -63,10 +63,18 @@ ENDCOLOR="\e[0m"
 #   Error message if not run as root
 #######################################
 function check_root() {
+    clear
+    echo -e "${BLUE}+--------------------+${ENDCOLOR}"
+    echo -e "${BLUE}|    Checking Root   |${ENDCOLOR}"
+    echo -e "${BLUE}+--------------------+${ENDCOLOR}\n"
+
     if [ "$EUID" -ne 0 ]; then
-        echo -e "${RED}Please run as root.${ENDCOLOR}"
+        echo -e "${RED}[ERROR]${ENDCOLOR} Please run as root."
         exit
     fi
+
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} You're logging as root."
+    read -p "Press any key to continue... " -n1 -s  
 }
 
 
@@ -94,29 +102,29 @@ function starting() {
 
     systemctl enable --now cockpit.socket
 
+    dnf install neofetch -y
+    echo -e "clear\nneofetch" >> ./.bashrc
+
     while true; do 
         clear
-        echo -e "${BLUE}-----------------${ENDCOLOR}"
-        echo -e "${BLUE}    Welcome    ${ENDCOLOR}"
-        echo -e "${BLUE}-----------------${ENDCOLOR}\n"
-
-        echo -e "To ensure that the configuration runs smoothly, we're going to ask you"
-        echo -e "a few questions about the services we're going to set up.\n"
-
+        echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+        echo -e "${BLUE}|     Welcome     |${ENDCOLOR}"
+        echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
+        echo -e "${BLUE}[INFO]${ENDCOLOR} To ensure that the configuration runs smoothly, we're going to ask you"
+        echo -e "${BLUE}[INFO]${ENDCOLOR} a few questions about the services we're going to set up.\n"
         read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME; echo "HOSTNAME=$HOSTNAME" > ./config.conf
         read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME; echo "SERVERNAME=$SERVERNAME" >> ./config.conf
         read -p "Enter the domain (ex : .[lan]) : " DOMAIN; echo "DOMAIN=$DOMAIN" >> ./config.conf
 
-        echo -e "\nHere is the informations about your Network."
-        echo -e "Please, answer to the next questions\n"
+        echo -e "\n${BLUE}[INFO]${ENDCOLOR} Here is the informations about your Network."
+        echo -e "${BLUE}[INFO]${ENDCOLOR} Please, answer to the next questions\n"
         ip address
-        echo -e "\n"
 
         read -p "Enter the IP Address (ex : [192.168.1.120]) : " IPADDRESS; echo "IPADDRESS=$IPADDRESS" >> ./config.conf
         read -p "Enter the Network Address (ex : [192.168.1.0]) : " NETWORKADDRESS; echo "NETWORKADDRESS=$NETWORKADDRESS" >> ./config.conf
         read -p "Enter the Subnet Mask (ex : 192.168.1.80/[24]) : " SUBNETMASK; echo "SUBNETMASK=$SUBNETMASK" >> ./config.conf
 
-        echo -e "Config.conf file :\n"
+        echo -e "${BLUE}[INFO]${ENDCOLOR} Config.conf file :\n"
         cat ./config.conf
         echo -e ""
         while true; do
@@ -125,17 +133,18 @@ function starting() {
             then
                 break
             else
-                echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
             fi
         done
 
         if [[ $YESORNO == "yes" ]]
         then 
-            echo -e "Good, go to the next step."
+            echo -e "${GREEN}[SUCCESS]${ENDCOLOR} File {config.conf} created."
             break
         fi 
     done 
-    echo -e "\n${GREEN}File {config.conf} created.${ENDCOLOR}\n"
+
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -150,14 +159,15 @@ function starting() {
 #######################################
 function update_system() {
     clear
-    echo -e "${BLUE}------------${ENDCOLOR}"
-    echo -e "${BLUE}   Update   ${ENDCOLOR}"
-    echo -e "${BLUE}------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+------------+${ENDCOLOR}"
+    echo -e "${BLUE}|   Update   |${ENDCOLOR}"
+    echo -e "${BLUE}+------------+${ENDCOLOR}\n"
 
     dnf update -y 
     dnf upgrade -y 
 
-    echo -e "\n${GREEN}Update done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Update done.\n"
+    read -p "Press any key to continue... " -n1 -s  
 }
 
 
@@ -172,15 +182,17 @@ function update_system() {
 #######################################
 function delete_users() {
     clear
-    echo -e "${BLUE}----------------${ENDCOLOR}"
-    echo -e "${BLUE}   Delete User  ${ENDCOLOR}"
-    echo -e "${BLUE}----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}"
+    echo -e "${BLUE}|  Delete User  |${ENDCOLOR}"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
 
     read -p "Enter the UID of the user to delete : " UID
     find / -uid $UID -exec rm -rf {} \;
     userdel -r $UID
 
-    echo -e "\n${GREEN}User deleted.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} User deleted.\n"
+    
+        
 }
 
 
@@ -200,9 +212,9 @@ function delete_users() {
 #######################################
 function global_configuration() {
     clear
-    echo -e "\n${BLUE}--------------------------${ENDCOLOR}"
-    echo -e "${BLUE}   Global Configurations  ${ENDCOLOR}"
-    echo -e "${BLUE}--------------------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-------------------------+${ENDCOLOR}"
+    echo -e "${BLUE}|  Global Configurations  |${ENDCOLOR}"
+    echo -e "${BLUE}+-------------------------+${ENDCOLOR}\n"
     
     source ./config.conf
     
@@ -214,33 +226,38 @@ function global_configuration() {
     systemctl restart NetworkManager
     systemctl enable --now cockpit.socket
 
-    echo -e "\n${GREEN}Hostname changed.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Hostname changed.\n"
 
     # All users will got as name : [familyname].[firstname]
     users_list=()
 
     while true; do
-        read -p "How many people need access to the server ? : [number] " NUMBERPEOPLE
+        read -p "How many people need access to the server ? [number] " NUMBERPEOPLE
         if [[ $NUMBERPEOPLE -ge 1 ]]; then
             break
         else
-            echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+            echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
         fi
     done
     
     for (( user=1; user<=$NUMBERPEOPLE; user++ )); do 
-        echo -e "\nUser number : $user"
-        echo -e "----------------\n"
+        echo -e "
+        {BLUE}[INFO]${ENDCOLOR} User number : $user
+        -------------------------------
+        "
+
         read -p "What's the username ? : [string] " USERNAME
 
         # ssh-keygen -L -f [public key file] to see informations about this key
 
         if [ $(id -u $USERNAME) ]
         then
-            echo -e "${RED}This username already exists.${ENDCOLOR}"
+            echo -e "${RED}[ERROR]${ENDCOLOR} This username already exists."
+            
             sudo -u $USERNAME ssh-keygen -t rsa -b 4096 -C "$USERNAME@$IPADDRESS"
             mv /home/$USERNAME/.ssh/id_rsa.pub /home/$USERNAME/.ssh/authorized_keys
             users_list+=($USERNAME)
+            
             while true; do 
                 read -p "Does this person need to be an ftp user only ? [no/yes] " FTP
 
@@ -248,7 +265,7 @@ function global_configuration() {
                 then
                     break
                 else
-                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                    echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
                 fi
             done
 
@@ -266,7 +283,7 @@ function global_configuration() {
             then
                 break
             else
-                echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
             fi
         done
 
@@ -287,7 +304,7 @@ function global_configuration() {
                 then
                     break
                 else
-                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                    echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
                 fi
             done
 
@@ -311,7 +328,7 @@ function global_configuration() {
                 then
                     break
                 else
-                    echo -e "${RED}Invalid value, please try again.${ENDCOLOR}"
+                    echo -e "${RED}[ERROR]${ENDCOLOR} Invalid value, please try again."
                 fi
             done
 
@@ -322,11 +339,11 @@ function global_configuration() {
         fi 
     done
 
-    echo -e "\n${GREEN}Users and ssh key created.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Users and ssh key created.\n"
     
     echo -e "-----------------------------------"
-    echo -e "${RED}scp [user]@[server-ip]:/home/[user]/.ssh/id_rsa C:/users/[windows-user]/.ssh/${ENDCOLOR}"
-    echo -e "${RED}Please, transfer the private keys to : ${ENDCOLOR}\n" 
+    echo -e "${RED}[SUGGEST]${ENDCOLOR} scp [user]@[server-ip]:/home/[user]/.ssh/id_rsa C:/users/[windows-user]/.ssh/"
+    echo -e "${RED}[SUGGEST]${ENDCOLOR} Please, transfer the private keys to : \n" 
 
     # After the loop, please transfer the generated private keys 
     # to the users who need them. 
@@ -343,11 +360,8 @@ function global_configuration() {
         echo -e "- $user" 
     done 
 
-    echo -e ""
-    read -p "Press any key to continue... " -n1 -s 
-    echo -e "\n-----------------------------------"
-
     echo -e "\n${GREEN}Configuration done.${ENDCOLOR}\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -364,9 +378,9 @@ function global_configuration() {
 #######################################
 ssh_configuration() {
     clear
-    echo -e "\n${BLUE}---------------------${ENDCOLOR}"
-    echo -e "${BLUE}  SSH Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}---------------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+---------------------+${ENDCOLOR}"
+    echo -e "${BLUE}|  SSH Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+---------------------+${ENDCOLOR}\n"
 
     while true; do 
         read -p "Choose port for ssh : " PORT
@@ -374,7 +388,7 @@ ssh_configuration() {
             echo "PORT=$PORT" >> ./config.conf
             break
         else
-            echo -e "${RED}Invalid port, please try again.${ENDCOLOR}"
+            echo -e "${RED}[ERROR]${ENDCOLOR} Invalid port, please try again."
         fi
     done
 
@@ -401,7 +415,8 @@ ssh_configuration() {
 
     systemctl restart sshd
 
-    echo -e "\n${GREEN}SSH and firewalld configurations done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} SSH and firewalld configurations done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -417,10 +432,10 @@ ssh_configuration() {
 #######################################
 function backup_configuration() {
     clear
-    echo -e "\n${BLUE}---------------${ENDCOLOR}"
-    echo -e "${BLUE}    Backup     ${ENDCOLOR}"
-    echo -e "${BLUE} Configuration ${ENDCOLOR}"
-    echo -e "${BLUE}---------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}"
+    echo -e "${BLUE}|    Backup     |${ENDCOLOR}"
+    echo -e "${BLUE}| Configuration |${ENDCOLOR}"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
 
     touch /sbin/dailybackup
     chmod 755 /sbin/dailybackup
@@ -460,7 +475,8 @@ EOF
     mkdir -p /root/.cache/crontab
     bash -c "(crontab -l 2>/dev/null; echo '0 12 * * * /sbin/dailybackup') | crontab -"
 
-    echo -e "${GREEN}Backup configuration done.${ENDCOLOR}\n"
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} Backup configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -477,9 +493,9 @@ EOF
 #######################################
 function restore_backup() {
     clear
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}  Restore Backup ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|  Restore Backup |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     touch /sbin/restorebackup
     chmod 755 /sbin/restorebackup
@@ -506,7 +522,8 @@ for dir in etc web var home root; do
     tar -xzf "\$BACKUP_FILE" -C "/"
 done
 EOF
-    echo -e "${GREEN}Backup restoration configuration completed.\n${ENDCOLOR}"
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} Backup restoration configuration completed.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -521,10 +538,10 @@ EOF
 #######################################
 function audit_configuration() {
     clear 
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      Audit      ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Audit      |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     source ./config.conf
 
@@ -537,7 +554,8 @@ function audit_configuration() {
     auditctl -w $WEBSITEPATH -p wa -k web_changes
     auditctl -w /etc/ssh/sshd_config -p wa -k ssh_changes
 
-    echo -e "${GREEN}Audit configuration completed.\n${ENDCOLOR}"
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} Audit configuration completed.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -552,19 +570,20 @@ function audit_configuration() {
 #######################################
 function rootkit_configuration() {
     clear 
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}     RootKit     ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|     RootKit     |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     dnf install rkhunter chkrootkit -y
     
-    echo -e "\n${RED}[INFO]${ENDCOLOR} 'rkhunter --update' may take several minutes\n"
+    echo -e "\n${BLUE}[INFO]${ENDCOLOR} 'rkhunter --update' may take several minutes\n"
     rkhunter --update
     rkhunter --check
     chkrootkit
 
-    echo -e "${GREEN}Rootkit configuration completed.\n${ENDCOLOR}"
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} Rootkit configuration completed.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -579,17 +598,19 @@ function rootkit_configuration() {
 #######################################
 function security_tests() {
     clear 
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      Lynis      ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Lynis      |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     dnf install lynis -y
     lynis audit system
 
     # To get last lines : tail -n 26 /var/log/lynis.log
     bash -c "(crontab -l 2>/dev/null; echo '30 12 * * * lynis audit system >> /var/log/lynis.log') | crontab -"
-    echo -e "${GREEN}Security Tests [Lynis] configuration completed.\n${ENDCOLOR}"
+
+    echo -e "${GREEN}[SUCCESS]${ENDCOLOR} Security Tests [Lynis] configuration completed.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -604,10 +625,10 @@ function security_tests() {
 #######################################
 function clamav_configuration() {
     clear 
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}     ClamAV      ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|     ClamAV      |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     dnf -y install clamav clamd 
 
@@ -626,7 +647,8 @@ function clamav_configuration() {
     firewall-cmd --add-port=3310/tcp --permanent
     firewall-cmd --reload
 
-    echo -e "\n${GREEN}ClamAV configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} ClamAV configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -643,10 +665,10 @@ function clamav_configuration() {
 #######################################
 function fail2ban_configuration() {
     clear 
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}    Fail2Ban     ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|    Fail2Ban     |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     source ./config.conf
 
@@ -686,7 +708,8 @@ function fail2ban_configuration() {
     fi 
     systemctl restart fail2ban
 
-    echo -e "\n${GREEN}Fail2Ban configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Fail2Ban configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -702,10 +725,10 @@ function fail2ban_configuration() {
 function nmap_configuration() {
     clear
     source ./config.conf
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      Nmap       ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Nmap       |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     source ./config.conf
     
@@ -716,7 +739,7 @@ function nmap_configuration() {
 
     nmap $IPADDRESS 
 
-    echo -e "\n${GREEN}Nmap configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Nmap configuration done.\n"
 }
 
 
@@ -732,10 +755,10 @@ function nmap_configuration() {
 #######################################
 function grub_configuration() {
     clear
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      Grub       ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Grub       |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
     
     # Use this function before changing /etc/fstab
     read -p "Enter the username : " USERNAMEGRUB
@@ -748,7 +771,8 @@ function grub_configuration() {
 
     grub2-mkconfig -o /boot/grub2/grub.cfg
 
-    echo -e "\n${GREEN}Grub configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Grub configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -764,10 +788,10 @@ function grub_configuration() {
 #######################################
 function fstab_configuration() {
     clear
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}     Fstab       ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Fstab      |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     echo -e "Available mounting options :"
     echo -e "----------------------------\n"
@@ -800,10 +824,10 @@ function fstab_configuration() {
         esac
     done
 
-    echo -e "\n${GREEN}Fstab configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Fstab configuration done.\n"
 
-    echo -e "The system will restart."
-    read -p "Press any key to continue... " -n1 -s
+    echo -e "${BLUE}[INFO]${ENDCOLOR} The system will restart."
+    read -p "Press any key to continue... " -n1 -s 
 
     shutdown -r now
 }
@@ -820,14 +844,14 @@ function fstab_configuration() {
 #######################################
 function ftp_configuration() {
     clear
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      SFTP       ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      SFTP       |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     source ./config.conf
 
-    echo -e "Let's create group for ftp\n"
+    echo -e "${BLUE}[INFO]${ENDCOLOR} Let's create group for ftp\n"
     read -p "Give me the name you want to : " GROUPNAME
 
     groupadd $GROUPNAME
@@ -860,8 +884,8 @@ function ftp_configuration() {
 
     done
     
-    
-    echo -e "\n${GREEN}FTP configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} FTP configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -876,22 +900,31 @@ function ftp_configuration() {
 #######################################
 function quota_configuration() {
     clear
-    echo -e "\n${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}      Quota      ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      Quota      |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     quotaon -avug
     quotacheck -avug
 
+
+    # ADD QUOTAS ext4
+    # ---------------
+    #
+    # umount -l /home
+    # tune2fs -O quota /dev/sda
+    # tune2fs -Q usrquota,grpquota,prjquota /dev/sda
+    # mount /home
+    #
     # ADD QUOTAS TO USERS 
+    # -------------------
     # setquota -u [username] [x_soft_blocks x_hard_blocks] [x_soft_inodes x_hard_inodes] [WHERE YOU WANT TO SETQUOTA]
     # setquota -g [groupname] [x_soft_blocks x_hard_blocks] [x_soft_inodes x_hard_inodes] [WHERE YOU WANT TO SETQUOTA]
     # quota -v (for verbose) -s (for human-readable) -u [user] to see what range of quotas you give to him
 
-    echo -e "\n${GREEN}Quota configuration done.${ENDCOLOR}\n"
-
-    read -p "Press any key to continue... " -n1 -s
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Quota configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -914,10 +947,10 @@ function httpd_configuration() {
 
     # You need to desactivate IPV6
     clear 
-    echo -e "${BLUE}---------------${ENDCOLOR}"
-    echo -e "${BLUE}     HTTPD     ${ENDCOLOR}"
-    echo -e "${BLUE} Configuration ${ENDCOLOR}"
-    echo -e "${BLUE}---------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}"
+    echo -e "${BLUE}|     HTTPD     |${ENDCOLOR}"
+    echo -e "${BLUE}| Configuration |${ENDCOLOR}"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
 
     source ./config.conf
 
@@ -993,7 +1026,8 @@ EOF
 
     reload_website_path_command
 
-    echo -e "\n${GREEN}Httpd configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Httpd configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -1035,7 +1069,7 @@ function add_users_to_apache_group() {
 
     for username in "${usernames[@]}"; do
         usermod -aG apache "$username"
-        echo "User $username added to the apache group."
+        echo "${BLUE}[INFO]${ENDCOLOR} User $username added to the apache group."
     done
 }
 
@@ -1053,10 +1087,10 @@ function add_users_to_apache_group() {
 function reload_website_path_command() {
     
     clear
-    echo -e "${BLUE}-------------------------${ENDCOLOR}"
-    echo -e "${BLUE}     Reload Websites     ${ENDCOLOR}"
-    echo -e "${BLUE}      Configuration      ${ENDCOLOR}"
-    echo -e "${BLUE}-------------------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-------------------------+${ENDCOLOR}"
+    echo -e "${BLUE}|     Reload Websites     |${ENDCOLOR}"
+    echo -e "${BLUE}|      Configuration      |${ENDCOLOR}"
+    echo -e "${BLUE}+-------------------------+${ENDCOLOR}\n"
 
     source ./config.conf
     dnf install -y inotify-tools
@@ -1113,18 +1147,19 @@ DEL
 #######################################
 function mariaDB_configuration() {
     clear
-    echo -e "${BLUE}-----------------${ENDCOLOR}"
-    echo -e "${BLUE}     MariaDB     ${ENDCOLOR}"
-    echo -e "${BLUE}  Configuration  ${ENDCOLOR}"
-    echo -e "${BLUE}-----------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}"
+    echo -e "${BLUE}|     MariaDB     |${ENDCOLOR}"
+    echo -e "${BLUE}|  Configuration  |${ENDCOLOR}"
+    echo -e "${BLUE}+-----------------+${ENDCOLOR}\n"
 
     dnf install mariadb-server mariadb -y
     systemctl start mariadb 
     systemctl enable mariadb
-    echo -e "You should answer by n, n, y, y, y, y and then y"
+    echo -e "You should answer by y, n, y, y, y, y and then y"
 
     mysql_secure_installation
-    echo -e "\n${GREEN}MariaDB configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} MariaDB configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -1139,18 +1174,32 @@ function mariaDB_configuration() {
 #######################################
 function phpMyAdmin_configuration() {
     clear
-    echo -e "${BLUE}---------------${ENDCOLOR}"
-    echo -e "${BLUE}      PHP      ${ENDCOLOR}"
-    echo -e "${BLUE} Configuration ${ENDCOLOR}"
-    echo -e "${BLUE}---------------${ENDCOLOR}\n"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}"
+    echo -e "${BLUE}|      PHP      |${ENDCOLOR}"
+    echo -e "${BLUE}| Configuration |${ENDCOLOR}"
+    echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
 
+    # crow cloud remi phpmyadmin
     dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
     dnf install phpmyadmin -y
+    dnf install php-ldap openldap-clients -y
+
+    sudo setsebool -P httpd_can_network_connect 1
+    sudo setsebool -P httpd_can_connect_ldap 1
+    sudo setsebool -P authlogin_nsswitch_use_ldap 1
+    sudo setsebool -P nis_enabled 1
+
+    firewall-cmd --permanent --add-service=ldap
+    firewall-cmd --permanent --add-service=ldaps
+    firewall-cmd --reload
 
     sed -i "14s|local|all granted|" /etc/httpd/conf.d/phpMyAdmin.conf
     sed -i "18s|local|all granted|" /etc/httpd/conf.d/phpMyAdmin.conf
 
-    echo -e "\n${GREEN}PHP configuration done.${ENDCOLOR}\n"
+    systemctl restart httpd
+
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} PHP configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -1171,10 +1220,10 @@ function add_services() {
 
     while true; do 
         clear
-        echo -e "\n${BLUE}---------------${ENDCOLOR}"
-        echo -e "${BLUE}   Services    ${ENDCOLOR}"
-        echo -e "${BLUE} configuration ${ENDCOLOR}"
-        echo -e "${BLUE}---------------${ENDCOLOR}\n"
+        echo -e "${BLUE}+---------------+${ENDCOLOR}"
+        echo -e "${BLUE}|   Services    |${ENDCOLOR}"
+        echo -e "${BLUE}| configuration |${ENDCOLOR}"
+        echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
         
         echo -e "1. Audit ${RED}[security]${ENDCOLOR}"
         echo -e "2. Rootkit (NOT AUTO) ${RED}[security]${ENDCOLOR}" 
@@ -1192,8 +1241,9 @@ function add_services() {
         echo -e "14. Automatic configuration"
         echo -e "15. Previous menu\n"
 
-        echo -e "\n${RED}Note: we recommend that you run the 'grub' & 'fstab' \ncommand before executing the other commands,
-        \n'ftp' command after 'httpd' command${ENDCOLOR}"
+        echo -e "\n${RED}Note: we recommend that you run the 'grub' & 'fstab'
+        command before executing the other commands,
+        'ftp' command after 'httpd' command${ENDCOLOR}"
 
         read -p "Enter your choice : " CHOICESERVICE
 
@@ -1238,9 +1288,9 @@ function main() {
     check_root
     while true; do 
         clear
-        echo -e "${BLUE}------${ENDCOLOR}"
-        echo -e "${BLUE} Menu ${ENDCOLOR}"
-        echo -e "${BLUE}------${ENDCOLOR}\n"
+        echo -e "${BLUE}+------+${ENDCOLOR}"
+        echo -e "${BLUE}| Menu |${ENDCOLOR}"
+        echo -e "${BLUE}+------+${ENDCOLOR}\n"
 
         echo -e "1. Update the system"
         echo -e "2. Global configurations"
