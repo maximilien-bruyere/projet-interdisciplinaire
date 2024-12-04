@@ -53,6 +53,57 @@ class WindowsServer
     }
 }
 
+class DHCP : WindowsServer {
+    [string]$scopeName
+    [string]$descriptionScope
+    [System.Net.IPAddress]$startRange
+    [System.Net.IPAddress]$endRange
+    [System.Net.IPAddress]$startExclusionRange
+    [System.Net.IPAddress]$endExclusionRange
+    [timespan]$leaseDuration
+
+    # Constructor
+    DHCP(
+        [System.Net.IPAddress]$ipAddress,
+        [int]$subnetMask,
+        [System.Net.IPAddress]$defaultGateway,
+        [string]$hostname,
+        [string]$domainName,
+        [string]$scopeName,
+        [string]$descriptionScope,
+        [System.Net.IPAddress]$startRange,
+        [System.Net.IPAddress]$endRange,
+        [System.Net.IPAddress]$startExclusionRange,
+        [System.Net.IPAddress]$endExclusionRange,
+        [timespan]$leaseDuration) : base($ipAddress, $subnetMask, $defaultGateway, $hostname, $domainName)
+    {   
+        $this.scopeName = $scopeName
+        $this.descriptionScope = $descriptionScope
+        $this.startRange = $startRange
+        $this.endRange = $endRange
+        $this.startExclusionRange = $startExclusionRange
+        $this.endExclusionRange = $endExclusionRange
+        $this.leaseDuration = $leaseDuration
+    }
+
+    [void]ConfigureDHCP() 
+    {
+        # DHCP service configuration 
+        # - Set up new scope
+        # - 
+
+        Add-DhcpServerv4Scope -Name $this.scopeName -Description $this.descriptionScope -StartRange $this.startRange -EndRange $this.endRange -SubnetMask $this.subnetMask -State Active
+        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 3 -Value $this.defaultGateway
+        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 6 -Value $this.ipAddress
+        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 15 -Value $this.domainName
+    }
+
+    [void]userClassDHCP()
+    {
+
+    }
+}
+
 function Get-Menu 
 {
     Clear-Host
