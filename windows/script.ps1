@@ -19,6 +19,7 @@ class WindowsServer
 {
     [System.Net.IPAddress]$ipAddress
     [int]$subnetMask
+    [System.Net.IPAddress]$networkAddress
     [System.Net.IPAddress]$defaultGateway
     [string]$hostname
     [string]$domainName
@@ -33,9 +34,10 @@ class WindowsServer
         $this.domainName = $domainName
     }
 
-    [void]ConfigureServer() 
+    [void] ConfigureServer() 
     {
         $interfaceAlias = (Get-NetAdapter | Where-Object { $_.Status -eq "Up" }).Name
+        # You could use (Get-NetAdapter).name but you got all interfaces names.
 
         # Basic Server Configuration
         # - Network
@@ -51,16 +53,28 @@ class WindowsServer
         New-NetFirewallRule -DisplayName "Allow ICMPv4-Out" -Protocol ICMPv4 -Direction Outbound -Action Allow
         Rename-Computer -NewName $this.hostname -Restart
     }
+
+    [string] WindowsServerMenu()
+    {
+        Clear-Host
+        $menu = "
+        +==============+
+        |     Menu     |
+        +==============+
+        1. Configure Windows Server
+        2. AD Configuration
+        3. DHCP Configuration
+        4. GPO Configuration
+        5. Show Windows Server Menu
+        6. Exit
+        =====================
+        "
+        return $menu
+    }
 }
 
-class DHCP : WindowsServer {
-    [string]$scopeName
-    [string]$descriptionScope
-    [System.Net.IPAddress]$startRange
-    [System.Net.IPAddress]$endRange
-    [System.Net.IPAddress]$startExclusionRange
-    [System.Net.IPAddress]$endExclusionRange
-    [timespan]$leaseDuration
+class DHCP : WindowsServer 
+{
 
     # Constructor
     DHCP(
@@ -68,92 +82,86 @@ class DHCP : WindowsServer {
         [int]$subnetMask,
         [System.Net.IPAddress]$defaultGateway,
         [string]$hostname,
-        [string]$domainName,
-        [string]$scopeName,
-        [string]$descriptionScope,
-        [System.Net.IPAddress]$startRange,
-        [System.Net.IPAddress]$endRange,
-        [System.Net.IPAddress]$startExclusionRange,
-        [System.Net.IPAddress]$endExclusionRange,
-        [timespan]$leaseDuration) : base($ipAddress, $subnetMask, $defaultGateway, $hostname, $domainName)
+        [string]$domainName) : base($ipAddress, $subnetMask, $defaultGateway, $hostname, $domainName
+        )
     {   
-        $this.scopeName = $scopeName
-        $this.descriptionScope = $descriptionScope
-        $this.startRange = $startRange
-        $this.endRange = $endRange
-        $this.startExclusionRange = $startExclusionRange
-        $this.endExclusionRange = $endExclusionRange
-        $this.leaseDuration = $leaseDuration
     }
 
-    [void]ConfigureDHCP() 
+    [void] ConfigureDHCP() 
     {
-        # DHCP service configuration 
-        # - Set up new scope
-        # - 
-
-        Add-DhcpServerv4Scope -Name $this.scopeName -Description $this.descriptionScope -StartRange $this.startRange -EndRange $this.endRange -SubnetMask $this.subnetMask -State Active
-        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 3 -Value $this.defaultGateway
-        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 6 -Value $this.ipAddress
-        Set-DhcpServerv4OptionValue -ScopeId $this.startRange.Split('.')[0..2] -join '.' + ".0" -OptionId 15 -Value $this.domainName
+        # Installation of DHCP services 
+        
+        Install-WindowsFeature DHCP -IncludeManagementTools
+        Set-DhcpServerv4DnsSetting -ComputerName "$($this.hostname)", "$($this.domainName)" -join "." -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True
+        Add-DhcpServerInDC -DnsName $this.domainName -IPAddress $this.ipAddress
+        Restart-Service dhcpserver
     }
-
-    [void]userClassDHCP()
+    
+    [void] ConfigureScope() 
     {
+        # Scope's Configuration 
+        # with policy (optionnal)
 
-    }
-}
+        $scopeName = Read-Host "Scope's name : "
+        $descriptionScope = Read-Host "Description ($($scopeName)) : "
+       
+        $startScopeRange = [System.Net.IPAddress]::Parse((Read-Host "Start Scope Range : "))
+        $endScopeRange = [System.Net.IPAddress]::Parse((Read-Host "End Scope Range : "))
+        
+        $startExclusionRange = [System.Net.IPAddress]::Parse((Read-Host "Start Exclusion Range : "))
+        $endExclusionRange = [System.Net.IPAddress]::Parse((Read-Host "End Exclusion Range : "))
+        
+        $subnetMask = Read-Host "SubnetMask : "
+        $networkAddress = [System.Net.IPAddress]::Parse((Read-Host "Network Address : "))
 
-function Get-Menu 
-{
-    Clear-Host
-    Write-Host "+==============+"
-    Write-Host "|     Menu     |"
-    Write-Host "+==============+"
-    Write-Host "1. Basic Server Configuration"
-    Write-Host "2. DHCP Configuration"
-    Write-Host "3. AD Configuration"
-    Write-Host "4. GPO Configuration"
-    Write-Host "5. Exit"
-    Write-Host "====================="
-}
-
-function main 
-{
-    param (
-        [System.Net.IPAddress]$ipAddress,
-        [System.Net.IPAddress]$defaultGateway,
-        [string]$hostname
-    )
-
-    $myServer = [WindowsServer]::new($ipAddress, $defaultGateway, $hostname)
-
-    do {
-        Get-Menu
-        $choice = Read-Host "Enter your choice (1-5)"
-        switch ($choice) {
-            1 {
-                $myServer.ConfigureServer()
-                pause
-            }
-            2 {
-
-            }
-            3 {
-
-            }
-            4 {
-
-            }
-            5 {
-                Write-Host "Exiting..."
-                break
-            }
-            default {
-                Write-Host "Invalid choice ... Please retry."
-                Pause
-            }
+        $leaseDuration = [timespan]::Parse()
+        
+        Add-DhcpServerv4Scope -Name $scopeName -Description $descriptionScope -StartRange $startScopeRange -EndRange $endScopeRange -SubnetMask $subnetMask -State Active
+        Add-DhcpServerv4ExclusionRange -ScopeID $networkAddress -StartRange $startExclusionRange -EndRange $endExclusionRange
+        Set-DhcpServerv4OptionValue -ScopeId $networkAddress -OptionId 3 -Value $this.defaultGateway -ComputerName "$($this.hostname)", "$($this.domainName)" -join "."
+        Set-DhcpServerv4OptionValue -DnsDomain $this.domainName -DnsServer $this.ipAddress
+    
+        # User Class
+        $addUserClass = Read-Host "Do you want to add a user class? (yes/no) : "
+        if ($addUserClass -eq "yes") {
+            DHCPClientClass -ScopeId $networkAddress
         }
+    
+        Restart-Service dhcpserver
+    }
+    
+    [void] DHCPClientClass($ScopeId) 
+    {
+        $className = Read-Host "Class name : "
+        $classData = Read-Host "ASCII Code : "
 
-    } while ($choice -ne 5)
+        # User Class Creation
+        Add-DhcpServerv4Class -Name $className -Type User -Data $classData
+    
+        # User CLass Options
+        $addOptions = Read-Host "Do you want to add specific options for this class? (yes/no) : "
+        while ($addOptions -eq "yes") {
+            $optionId = Read-Host "Option ID : "
+            $optionValue = Read-Host "Option Value : "
+            Set-DhcpServerv4OptionValue -ScopeId $ScopeId -ClassName $className -OptionId $optionId -Value $optionValue
+            $addOptions = Read-Host "Do you want to add another option? (yes/no) : "
+        }
+    }
+    
+    [string] DHCPMenu() 
+    {
+        $menu = "
+        +==============+
+        |     Menu     |
+        +==============+
+        1. Configure DHCP
+        3. Scope Configuration
+        4. Show DHCP Menu
+        5. Exit
+        =====================
+        "
+        return $menu
+    }
 }
+
+
