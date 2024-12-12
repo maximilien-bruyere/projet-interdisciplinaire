@@ -21,6 +21,11 @@
 #
 ###############
 
+
+
+<#
+WINDOWSSERVER
+#>
 class WindowsServer 
 {
     [System.Net.IPAddress]$ipAddress
@@ -71,6 +76,9 @@ class WindowsServer
 }
 
 
+<#
+DHCP
+#>
 class DHCP : WindowsServer {
 
     # Constructor
@@ -105,7 +113,7 @@ class DHCP : WindowsServer {
         {
             Set-DhcpServerv4DnsSetting -ComputerName "$($this.hostname).$($this.domainName)" -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True
             Add-DhcpServerInDC -DnsName $this.domainName -IPAddress $this.ipAddress
-            Restart-Computer
+            Restart-Service dhcpserver
         } 
         
         catch 
@@ -120,20 +128,28 @@ class DHCP : WindowsServer {
                         $networkScopeAddress,
                         $startScopeRange,
                         $endScopeRange,
+                        $startExclusionRange,
+                        $endExclusionRange,
                         $subnetMask,
                         $leaseDuration)
     {
 
         $startScopeRange = [System.Net.IPAddress]::Parse($startScopeRange)
         $endScopeRange = [System.Net.IPAddress]::Parse($endScopeRange)
+
+        $startExclusionRange = [System.Net.IPAddress]::Parse($startExclusionRange)
+        $endExclusionRange = [System.Net.IPAddress]::Parse($endExclusionRange)
+
         $subnetMask = [System.Net.IPAddress]::Parse($subnetMask)
         $networkScopeAddress = [System.Net.IPAddress]::Parse($networkScopeAddress)
+
         $leaseDuration = [TimeSpan]::Parse($leaseDuration)
 
         try 
         {
             Add-DhcpServerv4Scope -Name $scopeName -StartRange $startScopeRange -EndRange $endScopeRange -SubnetMask $subnetMask -LeaseDuration $leaseDuration -Description $descriptionScope
-            
+            Add-Dhcpserverv4ExclusionRange -ScopeId $networkScopeAddress -StartRange $startExclusionRange -EndRange $endExclusionRange
+
             if ($this.defaultGateway -ne [System.Net.IPAddress]::Parse("0.0.0.0")) {
                 Set-DhcpServerv4OptionValue -ScopeId $networkScopeAddress -OptionId 3 -Value $this.defaultGateway
             } else {
@@ -184,11 +200,14 @@ class DHCP : WindowsServer {
             $userClass = Read-Host "User Class "
             $condition = Read-Host "Condition (OR/AND) "
             $router = [System.Net.IPAddress]::Parse((Read-Host "Router (x.x.x.x) "))
-            $dnsDomainName = Read-Host "DNS Domain Name "
             $dnsServer = [System.Net.IPAddress]::Parse((Read-Host "DNS Server (x.x.x.x) "))
-            $subnetMask = [System.Net.IPAddress]::Parse((Read-Host "Scope's SubnetMask (x.x.x.x) "))
+            $dnsDomainName = Read-Host "DNS Domain Name "
+            $startPolicyScopeRange = [System.Net.IPAddress]::Parse((Read-Host "Start Policy Scope Range (x.x.x.x) "))
+            $endPolicyScopeRange = [System.Net.IPAddress]::Parse((Read-Host "End Policy Scope Range (x.x.x.x) "))
 
             Add-DhcpServerv4Policy -Name $policyName -ScopeId $networkScopeAddress -Condition $condition -UserClass EQ,$userClass
+
+            Add-DhcpServerv4PolicyIPRange -ComputerName "$($this.hostname).$($dnsDomainName)" -ScopeId $networkScopeAddress -Name $policyName -StartRange $startPolicyScopeRange -EndRange $endPolicyScopeRange
 
             Set-DhcpServerv4OptionValue -ComputerName "$($this.hostname).$($dnsDomainName)" -ScopeId $networkScopeAddress -PolicyName $policyName -OptionId 3 -Value $router
             Set-DhcpServerv4OptionValue -ComputerName "$($this.hostname).$($dnsDomainName)" -ScopeId $networkScopeAddress -PolicyName $policyName -OptionId 15 -Value $dnsDomainName
@@ -207,8 +226,8 @@ class DHCP : WindowsServer {
     {
         try 
         {
-            $className = Read-Host "Class name : "
-            $classData = Read-Host "ASCII Code : "
+            $className = Read-Host "Class name "
+            $classData = Read-Host "ASCII Code "
             Add-DhcpServerv4Class  -Name $className -Type User -Data $classData
         } 
         
@@ -221,7 +240,9 @@ class DHCP : WindowsServer {
 }
 
 
-
+<#
+ACTIVE DIRECTORY
+#>
 class ActiveDirectory : WindowsServer 
 {
     # Constructor
@@ -278,7 +299,8 @@ class ActiveDirectory : WindowsServer
         }
     }
 
-    [void] CreatePrimaryZone() {
+    [void] CreatePrimaryZone() 
+    {
         try 
         {
             Add-DnsServerPrimaryZone -NetworkId "$($this.networkAddress)/$($this.subnetMask)" -ReplicationScope "Forest" -ErrorAction Stop
@@ -291,7 +313,13 @@ class ActiveDirectory : WindowsServer
         }
     }
 
-    [void] CreatePTRRecord() {
+    [void] RecycleBin()
+    {
+        Enable-ADOptionalFeature 'Recycle Bin Feature' -Scope ForestOrConfigurationSet -Target $this.domainName
+    }
+
+    [void] CreatePTRRecord() 
+    {
         try 
         {
             $reverseZone = ($this.ipAddress.ToString().Split('.')[2..0] -join '.') + ".in-addr.arpa"
@@ -306,6 +334,7 @@ class ActiveDirectory : WindowsServer
         }
     }
 }
+
 
 function main () 
 {
@@ -362,11 +391,14 @@ Note : I advice you to select these options
                 $startScopeRange = Read-Host("[x.x.x.x] Start IP Scope Range ")
                 $endScopeRange = Read-Host("[x.x.x.x] End IP Scope Range ")
 
+                $startExclusionRange = Read-Host("[x.x.x.x] Start Exclusion IP Scope Range ")
+                $endExclusionRange = Read-Host("[x.x.x.x] End Exclusion IP Scope Range ")
+
                 $ScopeSubnetMask = Read-Host("[x.x.x.x] Scope Subnet Mask ")
                 $networkScopeAddress = Read-Host("[x.x.x.x] Network Scope Address ")
 
                 $leaseDuration = Read-Host("[xx:xx:xx] Scope Lease Duration ")
-                $dhcpServer.ConfigureScope($scopeName,$descriptionScope,$networkScopeAddress,$startScopeRange,$endScopeRange,$ScopeSubnetMask,$leaseDuration)
+                $dhcpServer.ConfigureScope($scopeName,$descriptionScope,$networkScopeAddress,$startScopeRange,$endScopeRange,$startExclusionRange, $endExclusionRange, $ScopeSubnetMask,$leaseDuration)
             }
             7 { 
                 Write-Host "Ciao !"
@@ -377,4 +409,4 @@ Note : I advice you to select these options
     }
 }
 
-main -ipAddress "192.168.3.10" -subnetMask 24 -networkAddress "192.168.3.0" -defaultGateway "192.168.3.1" -hostname "gabroo" -domain "atrien.lan"
+main -ipAddress "192.168.3.10" -subnetMask 24 -networkAddress "192.168.3.0" -defaultGateway "192.168.3.1" -hostname "main" -domain "nordic.lan"
