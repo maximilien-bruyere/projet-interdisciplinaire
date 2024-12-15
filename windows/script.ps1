@@ -409,4 +409,4 @@ Note : I advice you to select these options
     }
 }
 
-main -ipAddress "192.168.3.10" -subnetMask 24 -networkAddress "192.168.3.0" -defaultGateway "192.168.3.1" -hostname "main" -domain "nordic.lan"
+main -ipAddress "192.168.1.10" -subnetMask 24 -networkAddress "192.168.1.0" -defaultGateway "192.168.1.1" -hostname "main" -domain "nordic.lan"

@@ -741,6 +741,7 @@ function nmap_configuration() {
     nmap $IPADDRESS 
 
     echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Nmap configuration done.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -927,6 +928,24 @@ function quota_configuration() {
     echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Quota configuration done.\n"
     read -p "Press any key to continue... " -n1 -s 
 }
+
+
+######################################
+# Configure Django settings.
+# Globals:
+#
+# Arguments:
+#   None
+#
+######################################
+function django_configuration() {
+
+}
+
+
+
+
+
 
 
 #######################################
