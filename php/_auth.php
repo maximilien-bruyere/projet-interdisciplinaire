@@ -10,7 +10,6 @@ function authenticate_user($email, $password) {
     $admin_user = "CN=admin,OU=Administration,DC=bruyere-lab,DC=com";
     $admin_password = "Maximilien2004";
 
-    // Connect to the LDAP server
     $ldap_conn = ldap_connect($ldap_host, $ldap_port);
     if (!$ldap_conn) {
         die("Unable to connect to the LDAP server");
@@ -80,9 +79,7 @@ $email = $_POST['email'];
 $password = $_POST['password'];
 $user_info = authenticate_user($email, $password);
 
-// Stocker les informations de l'utilisateur dans la session
 $_SESSION['user_info'] = $user_info;
 
-// Rediriger vers la page de bienvenue
 header("Location: welcome.php");
 exit();
