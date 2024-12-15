@@ -113,6 +113,7 @@ function starting() {
         echo -e "${BLUE}[INFO]${ENDCOLOR} To ensure that the configuration runs smoothly, we're going to ask you"
         echo -e "${BLUE}[INFO]${ENDCOLOR} a few questions about the services we're going to set up.\n"
         read -p "Enter the hostname (ex : [fedora].WindowsServer2019.lan) : " HOSTNAME; echo "HOSTNAME=$HOSTNAME" > ./config.conf
+        read -p "Enter the hostname (WINDOWS SERVER) : " WINHOSTNAME; echo "WINHOSTNAME=$WINHOSTNAME" > ./config.conf
         read -p "Enter the server name (ex : [WindowsServer2019].lan) : " SERVERNAME; echo "SERVERNAME=$SERVERNAME" >> ./config.conf
         read -p "Enter the domain (ex : .[lan]) : " DOMAIN; echo "DOMAIN=$DOMAIN" >> ./config.conf
 
@@ -360,7 +361,7 @@ function global_configuration() {
         echo -e "- $user" 
     done 
 
-    echo -e "\n${GREEN}Configuration done.${ENDCOLOR}\n"
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} Configuration done. \n"
     read -p "Press any key to continue... " -n1 -s 
 }
 
@@ -1009,14 +1010,13 @@ EOF
     firewall-cmd --permanent --add-service=https 
     firewall-cmd --reload
 
-
     semanage fcontext -a -e /var/www $WEBSITEPATH
     
     # Old comments ;
     # Don't forget to use these commands 
     # when you're putting new file(s) in 
     # your website path(s)
-    
+
     restorecon -Rv $PARENTFOLDER
     chcon -R -t httpd_sys_content_t $WEBSITEPATH
     chown -R apache:apache $WEBSITEPATH
@@ -1071,6 +1071,9 @@ function add_users_to_apache_group() {
         usermod -aG apache "$username"
         echo "${BLUE}[INFO]${ENDCOLOR} User $username added to the apache group."
     done
+
+    echo -e "\n${GREEN}[SUCCESS]${ENDCOLOR} All users added.\n"
+    read -p "Press any key to continue... " -n1 -s 
 }
 
 
@@ -1179,10 +1182,19 @@ function phpMyAdmin_configuration() {
     echo -e "${BLUE}| Configuration |${ENDCOLOR}"
     echo -e "${BLUE}+---------------+${ENDCOLOR}\n"
 
+    source ./config.conf
+
     # crow cloud remi phpmyadmin
     dnf install php php-common php-mysqlnd php-curl php-xml php-json php-gd php-mbstring -y
     dnf install phpmyadmin -y
     dnf install php-ldap openldap-clients -y
+    
+    dnf install mod_ldap -y
+
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    php composer-setup.php
+    php -r "unlink('composer-setup.php');"
+    sudo mv composer.phar /usr/local/bin/composer
 
     sudo setsebool -P httpd_can_network_connect 1
     sudo setsebool -P httpd_can_connect_ldap 1
