@@ -938,14 +938,7 @@ function quota_configuration() {
 #   None
 #
 ######################################
-function django_configuration() {
-
-}
-
-
-
-
-
+# function django_configuration() {}
 
 
 #######################################
